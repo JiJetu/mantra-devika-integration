@@ -1,0 +1,71 @@
+import { useForm } from "react-hook-form";
+
+const AddHeadingAnnouncement = () => {
+  const { register, handleSubmit } = useForm();
+
+  const onSubmit = (data) => {
+    console.log("New Announcement:", data);
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-6 md:space-y-8 lora"
+    >
+      {/* Title */}
+      <div>
+        <label className="block text-sm md:text-base text-gray-700 mb-1 md:mb-2">
+          Title
+        </label>
+        <input
+          {...register("title")}
+          placeholder="Enter Title"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm md:text-base"
+        />
+      </div>
+
+      {/* Start Date & End Date */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm md:text-base text-gray-700 mb-1 md:mb-2">
+            Start Date
+          </label>
+          <input
+            type="date"
+            {...register("startDate")}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm md:text-base"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm md:text-base text-gray-700 mb-1 md:mb-2">
+            End Date
+          </label>
+          <input
+            type="date"
+            {...register("endDate")}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm md:text-base"
+          />
+        </div>
+      </div>
+
+      {/* Buttons */}
+      <div className="flex flex-col md:flex-row gap-4 pt-6">
+        <button
+          type="submit"
+          className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium text-base"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+};
+
+export default AddHeadingAnnouncement;
