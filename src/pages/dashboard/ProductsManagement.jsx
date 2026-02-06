@@ -9,125 +9,33 @@ import {
   Trash2,
   TrendingDown,
   SquarePen,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import Heading from "../../components/shared/Heading";
-import { IMAGES } from "../../assets";
 import Modal from "../../components/ui/Modal";
 import ViewSizes from "../../components/dashboard/productManagement/ViewSizes";
 import EditProduct from "../../components/dashboard/productManagement/EditProduct";
 import AddProduct from "../../components/dashboard/productManagement/AddProduct";
 import AddColor from "../../components/dashboard/productManagement/AddColor";
 import CustomSelect from "../../components/ui/CustomSelect";
+import Pagination from "../../components/shared/Pagination";
+import { useDebouncedValue } from "../../lib/hooks/useDebouncedValue";
+import { Modal as AntModal, message } from "antd";
+import {
+  useGetProductStatsQuery,
+  useListProductsQuery,
+  useDeleteProductMutation,
+} from "../../redux/features/dashboard/product.api";
 
-// Fake data (unchanged)
-const fakeProducts = [
-  {
-    id: 1,
-    name: "Waistcoats",
-    subtitle: "Comfortable cotton Waistcoats",
-    image: IMAGES.product,
-    price: 29.99,
-    initialStock: 500,
-    currentStock: 266,
-    sold: 234,
-    sizeStock: [
-      { size: "S", initial: 100, current: 45, sold: 55, color: "#FF0000" },
-      { size: "M", initial: 150, current: 65, sold: 85, color: "#E5E7EB" },
-      { size: "L", initial: 150, current: 92, sold: 58, color: "#FF0000" },
-      { size: "XL", initial: 100, current: 64, sold: 36, color: "#FF0000" },
-    ],
-  },
-  {
-    id: 2,
-    name: "Jacket",
-    subtitle: "Premium quality Jacket",
-    image: IMAGES.product,
-    price: 79.99,
-    initialStock: 400,
-    currentStock: 211,
-    sold: 189,
-    sizeStock: [
-      { size: "S", initial: 100, current: 45, sold: 55, color: "#FF0000" },
-      { size: "M", initial: 150, current: 65, sold: 85, color: "#E5E7EB" },
-      { size: "L", initial: 150, current: 92, sold: 58, color: "#FF0000" },
-      { size: "XL", initial: 100, current: 64, sold: 36, color: "#FF0000" },
-    ],
-  },
-  {
-    id: 3,
-    name: "Kurta",
-    subtitle: "Premium quality Kurta",
-    image: IMAGES.product,
-    price: 99.99,
-    initialStock: 200,
-    currentStock: 44,
-    sold: 156,
-    sizeStock: [
-      { size: "S", initial: 100, current: 45, sold: 55, color: "#FF0000" },
-      { size: "M", initial: 150, current: 65, sold: 85, color: "#E5E7EB" },
-      { size: "L", initial: 150, current: 92, sold: 58, color: "#FF0000" },
-      { size: "XL", initial: 100, current: 64, sold: 36, color: "#FF0000" },
-    ],
-  },
-  {
-    id: 4,
-    name: "Trouser",
-    subtitle: "Comfortable cotton Trouser",
-    image: IMAGES.product,
-    price: 99.99,
-    initialStock: 200,
-    currentStock: 44,
-    sold: 156,
-    sizeStock: [
-      { size: "S", initial: 100, current: 45, sold: 55, color: "#FF0000" },
-      { size: "M", initial: 150, current: 65, sold: 85, color: "#E5E7EB" },
-      { size: "L", initial: 150, current: 92, sold: 58, color: "#FF0000" },
-      { size: "XL", initial: 100, current: 64, sold: 36, color: "#FF0000" },
-    ],
-  },
-  {
-    id: 5,
-    name: "Trouser",
-    subtitle: "Comfortable cotton Trouser",
-    image: IMAGES.product,
-    price: 99.99,
-    initialStock: 200,
-    currentStock: 0,
-    sold: 200,
-    sizeStock: [
-      { size: "S", initial: 100, current: 45, sold: 55, color: "#FF0000" },
-      { size: "M", initial: 150, current: 65, sold: 85, color: "#E5E7EB" },
-      { size: "L", initial: 150, current: 92, sold: 58, color: "#FF0000" },
-      { size: "XL", initial: 100, current: 64, sold: 36, color: "#FF0000" },
-    ],
-  },
-];
-
-// Your helpers (unchanged)
-const getStockStatus = (current, initial) => {
-  if (current === 0) {
-    return {
-      label: "Out of Stock",
-      color: "bg-red-100 text-red-700 border-red-200",
-      dotColor: "bg-red-500",
-    };
-  }
-  if (current <= initial * 0.25) {
-    return {
-      label: "Low Stock",
-      color: "bg-orange-100 text-orange-700 border-orange-200",
-      dotColor: "bg-orange-500",
-    };
-  }
-  return {
-    label: "In Stock",
-    color: "bg-green-100 text-green-700 border-green-200",
-    dotColor: "bg-green-500",
-  };
+const statusBadge = (status) => {
+  const s = String(status || "").toLowerCase();
+  if (s === "in_stock")
+    return "bg-green-100 text-green-700 border-green-200";
+  if (s === "out_of_stock")
+    return "bg-red-100 text-red-700 border-red-200";
+  return "bg-gray-100 text-gray-700 border-gray-200";
 };
 
+// Your helpers (unchanged)
 const getProgressColor = (percent) => {
   if (percent >= 50) return "bg-[#00C950]";
   if (percent >= 25) return "bg-yellow-500";
@@ -136,6 +44,7 @@ const getProgressColor = (percent) => {
 
 const ProductsManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedTerm = useDebouncedValue(searchTerm, 450);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedEditProduct, setSelectedEditProduct] = useState(null);
@@ -144,38 +53,52 @@ const ProductsManagement = () => {
 
   const itemsPerPage = 10;
 
-  // Filter products
-  const filteredProducts = fakeProducts.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.subtitle.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const { data: stats } = useGetProductStatsQuery();
+  const { data: listData, isFetching } = useListProductsQuery({
+    page: currentPage,
+    page_size: itemsPerPage,
+    q: debouncedTerm || undefined,
+  });
+  const [deleteProduct] = useDeleteProductMutation();
 
-  // Pagination
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedProducts = filteredProducts.slice(
-    startIndex,
-    startIndex + itemsPerPage,
-  );
+  const totalPages = listData?.total_pages ?? 0;
+  const products = (listData?.results ?? []).map((p) => ({
+    id: p.product_id,
+    name: p.product_name,
+    subtitle: p.product_description,
+    image: String(p.product_main_image || "").trim(),
+    price: p.price,
+    currentStock: p.current_stock,
+    sold: p.sold,
+    status: p.status,
+    variants: p.product_variant ?? [],
+  }));
 
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
-  // Stats
-  const totalProducts = fakeProducts.length;
-  const totalCurrentStock = fakeProducts.reduce(
-    (sum, p) => sum + p.currentStock,
-    0,
-  );
-  const totalSold = fakeProducts.reduce((sum, p) => sum + p.sold, 0);
-  const lowStockItems = fakeProducts.filter(
-    (p) => p.currentStock > 0 && p.currentStock <= p.initialStock * 0.25,
-  ).length;
+  const totalProducts = stats?.total_product ?? 0;
+  const totalCurrentStock = stats?.total_current_stock ?? 0;
+  const totalSold = stats?.total_sold ?? 0;
+  const lowStockItems = stats?.total_low_stock_item ?? 0;
 
   const handleViewSizes = (product) => {
     setSelectedProduct(product);
+  };
+
+  const confirmDelete = (productId) => {
+    AntModal.confirm({
+      title: "Delete Product",
+      content: "Are you sure you want to delete this product?",
+      okText: "Delete",
+      cancelText: "Cancel",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await deleteProduct(productId).unwrap();
+        message.success("Product deleted successfully");
+      },
+    });
   };
 
   return (
@@ -302,16 +225,10 @@ const ProductsManagement = () => {
                     Price
                   </th>
                   <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
-                    Initial Stock
-                  </th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                     Current Stock
                   </th>
                   <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                     Sold
-                  </th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
-                    Stock Status
                   </th>
                   <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                     Status
@@ -322,145 +239,104 @@ const ProductsManagement = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {paginatedProducts.map((product) => {
-                  const stockStatus = getStockStatus(
-                    product.currentStock,
-                    product.initialStock,
-                  );
-                  const soldPercent =
-                    product.initialStock > 0
-                      ? 100 - (product.sold / product.initialStock) * 100
-                      : 0;
+                {isFetching ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-6 text-center text-gray-500">
+                      Loading...
+                    </td>
+                  </tr>
+                ) : products.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-6 text-center text-gray-500">
+                      No products found.
+                    </td>
+                  </tr>
+                ) : (
+                  products.map((product) => {
+                    const soldPercent = 0; // no initial stock data
 
-                  return (
-                    <tr
-                      key={product.id}
-                      className="hover:bg-gray-50/70 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-4">
-                          <img
-                            src={product.image}
-                            alt={product.name}
-                            className="w-14 h-18 object-cover rounded border border-gray-200 shadow-sm"
-                          />
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {product.name}
-                            </p>
-                            <p className="text-sm text-gray-500 mt-0.5">
-                              {product.subtitle}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center font-medium text-gray-900">
-                        ${product.price.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 text-center text-gray-600">
-                        {product.initialStock}
-                      </td>
-                      <td
-                        className={`px-6 py-4 text-center font-medium ${Number(product.currentStock) < 50 ? "text-red-600" : "text-gray-900"}`}
+                    return (
+                      <tr
+                        key={product.id}
+                        className="hover:bg-gray-50/70 transition-colors"
                       >
-                        {product.currentStock}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1">
-                          <TrendingDown className="text-[#FB2C36]" />
-                          <span className="font-medium text-gray-900">
-                            {product.sold}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="flex items-center gap-1">
-                          <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${getProgressColor(soldPercent)} transition-all`}
-                              style={{ width: `${soldPercent}%` }}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <img
+                              src={product.image}
+                              alt={product.name}
+                              className="w-14 h-18 object-cover rounded border border-gray-200 shadow-sm"
                             />
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {product.name}
+                              </p>
+                              <p className="text-sm text-gray-500 mt-0.5">
+                                {product.subtitle}
+                              </p>
+                            </div>
                           </div>
-                          <span className="text-xs text-gray-500">
-                            {soldPercent.toFixed(1)}%
-                          </span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span
-                          className={`inline-block px-3.5 py-1 text-xs font-medium rounded-full border ${stockStatus.color}`}
+                        </td>
+                        <td className="px-6 py-4 text-center font-medium text-gray-900">
+                          ${Number(product.price).toFixed(2)}
+                        </td>
+                        <td
+                          className={`px-6 py-4 text-center font-medium ${Number(product.currentStock) < 50 ? "text-red-600" : "text-gray-900"}`}
                         >
-                          {stockStatus.label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex items-center justify-center gap-4">
-                          <button
-                            onClick={() => setSelectedProduct(product)}
-                            className="text-[#9810FA] px-3 py-1 bg-[#FAF5FF] rounded-lg transition-colors text-sm md:text-base"
+                          {product.currentStock}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-1">
+                            <TrendingDown className="text-[#FB2C36]" />
+                            <span className="font-medium text-gray-900">
+                              {product.sold}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span
+                            className={`inline-block px-3.5 py-1 text-xs font-medium rounded-full border ${statusBadge(product.status)}`}
                           >
-                            View Sizes
-                          </button>
-                          <button
-                            onClick={() => setSelectedEditProduct(product)}
-                            className="text-[#155DFC] transition-colors"
-                          >
-                            <SquarePen size={18} />
-                          </button>
-                          <button className="text-red-600 hover:text-red-800 transition-colors">
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                            {String(product.status || "").replaceAll("_", " ")}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex items-center justify-center gap-4">
+                            <button
+                              onClick={() => setSelectedProduct(product)}
+                              className="text-[#9810FA] px-3 py-1 bg-[#FAF5FF] rounded-lg transition-colors text-sm md:text-base"
+                            >
+                              View Sizes
+                            </button>
+                            <button
+                              onClick={() => setSelectedEditProduct(product)}
+                              className="text-[#155DFC] transition-colors"
+                            >
+                              <SquarePen size={18} />
+                            </button>
+                            <button
+                              onClick={() => confirmDelete(product.id)}
+                              className="text-red-600 hover:text-red-800 transition-colors"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination */}
-          <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 text-sm text-gray-600 border-t">
-            <div>
-              Showing {startIndex + 1} to{" "}
-              {Math.min(startIndex + itemsPerPage, filteredProducts.length)} of{" "}
-              {filteredProducts.length} products
-            </div>
-
-            <div className="flex items-center gap-2 mt-3 sm:mt-0">
-              <button
-                onClick={() => goToPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="p-2 rounded-md border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                <ChevronLeft size={18} />
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                (page) => (
-                  <button
-                    key={page}
-                    onClick={() => goToPage(page)}
-                    className={`px-3 py-1.5 rounded-md border border-gray-300 font-medium ${
-                      currentPage === page
-                        ? "bg-primary text-white border-primary"
-                        : "hover:bg-gray-50"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ),
-              )}
-
-              <button
-                onClick={() => goToPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-md border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            pageSize={listData?.page_size ?? itemsPerPage}
+            totalCount={listData?.count ?? 0}
+            totalPages={totalPages}
+            onPageChange={goToPage}
+          />
         </div>
       </div>
 

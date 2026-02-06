@@ -27,7 +27,7 @@ const authPersistConfig = {
   key: "auth",
   storage,
   transforms: [encryptor],
-  whitelist: ["accessToken", "refreshToken"], // persist only required fields
+  whitelist: ["accessToken", "refreshToken", "user"],
 };
 
 const persistedAuthReducer = persistReducer(

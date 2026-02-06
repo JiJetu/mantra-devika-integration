@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useGetAdminUserQuery } from "../../redux/features/dashboard/dashboard.api";
 
 const DashboardHeader = ({ title, description }) => {
   const navigate = useNavigate();
   const [showTooltip, setShowTooltip] = useState(false);
+  const { data: admin } = useGetAdminUserQuery();
 
-  // Dynamic user data (replace with real auth context later)
-  const fullName = "Admin User";
-  const email = "admin@maantra.com";
+  const fullName =
+    [admin?.first_name, admin?.last_name].filter(Boolean).join(" ") ||
+    "Admin User";
+  const email = admin?.email || "admin@maantra.com";
   const shortName = fullName
     .split(" ")
     .map((n) => n[0])

@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema } from "../../lib/validation/authSchema";
 import { FaArrowRightToBracket } from "react-icons/fa6";
 
-export default function LoginForm({ onSubmit }) {
+export default function LoginForm({ onSubmit, isLoading = false }) {
   const {
     register,
     handleSubmit,
@@ -91,12 +91,12 @@ export default function LoginForm({ onSubmit }) {
 
       <Button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isSubmitting || isLoading}
         icon={FaArrowRightToBracket}
         iconPosition="left"
         className="w-full text-primary bg-secondary"
       >
-        {isSubmitting ? "Signing in..." : "Sign In"}
+        {isLoading || isSubmitting ? "Signing in..." : "Sign In"}
       </Button>
     </form>
   );

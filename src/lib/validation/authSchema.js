@@ -10,7 +10,7 @@ export const loginSchema = z.object({
   password: z
     .string()
     .min(1, { message: 'Password is required' })
-    .min(6, { message: 'Password must be at least 6 characters' }),
+    .min(4, { message: 'Password must be at least 4 characters' }),
 
   remember: z.boolean().optional().default(false),
 });

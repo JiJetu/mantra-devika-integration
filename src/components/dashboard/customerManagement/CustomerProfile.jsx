@@ -1,58 +1,14 @@
-// CustomerProfile.jsx (updated with card-based order history + refined buttons)
+import { Check, Ban, Trash2 } from "lucide-react";
+import { Modal, message } from "antd";
 import {
-  CheckCircle,
-  Truck,
-  RotateCcw,
-  EyeOff,
-  Check,
-  Ban,
-  Trash2,
-  UserX,
-} from "lucide-react";
+  useGetCustomerProfileQuery,
+  useSuspendUserMutation,
+  useDeleteUserMutation,
+  useActivateUserMutation,
+} from "../../../redux/features/dashboard/customer.api";
+import { formatDate } from "../../../lib/format/date";
 
-// Fake profile data (replace with dynamic props later)
-const fakeProfile = {
-  name: "John Doe",
-  id: 1,
-  email: "john@example.com",
-  phone: "+1 234 567 8900",
-  totalOrders: 12,
-  totalSpent: 1249.88,
-  joinDate: "2023-06-15",
-  status: "active",
-  orderStats: {
-    confirmed: 20,
-    delivered: 20,
-    returned: 1,
-  },
-  orderHistory: [
-    {
-      id: "ORD-2024-001",
-      date: "2024-01-05",
-      status: "confirmed",
-      amount: 139.97,
-    },
-    {
-      id: "ORD-2023-156",
-      date: "2023-12-30",
-      status: "processed",
-      amount: 249.99,
-    },
-    {
-      id: "ORD-2024-001",
-      date: "2024-01-05",
-      status: "dispatched",
-      amount: 139.97,
-    },
-    {
-      id: "ORD-2023-156",
-      date: "2023-12-30",
-      status: "delivered",
-      amount: 249.99,
-    },
-    // You can add more orders here to test scrolling
-  ],
-};
+ 
 
 const getStatusStyle = (status) => {
   switch (status) {
@@ -64,14 +20,23 @@ const getStatusStyle = (status) => {
 };
 
 const getOrderStatusStyle = (status) => {
-  switch (status) {
-    case "confirmed":
+  const s = String(status || "").toUpperCase();
+  switch (s) {
+    case "CONFIRMED":
       return "bg-green-100 text-green-700 border-green-300";
-    case "processed":
+    case "PROCESSED":
       return "bg-orange-100 text-orange-700 border-orange-300";
-    case "dispatched":
+    case "DISPATCHED":
       return "bg-blue-100 text-blue-700 border-blue-300";
-    case "delivered":
+    case "DELIVERED":
+      return "bg-gray-100 text-gray-700 border-gray-300";
+    case "PAID":
+      return "bg-green-100 text-green-700 border-green-300";
+    case "PENDING":
+      return "bg-orange-100 text-orange-700 border-orange-300";
+    case "FAILED":
+      return "bg-red-100 text-red-700 border-red-300";
+    case "CANCELLED":
       return "bg-gray-100 text-gray-700 border-gray-300";
     default:
       return "bg-gray-100 text-gray-700 border-gray-300";
@@ -79,22 +44,88 @@ const getOrderStatusStyle = (status) => {
 };
 
 const getOrderStatusText = (status) => {
-  return status.charAt(0).toUpperCase() + status.slice(1);
+  const s = String(status || "").toLowerCase();
+  switch (s) {
+    case "paid":
+      return "Paid";
+    case "pending":
+      return "Pending";
+    case "failed":
+      return "Failed";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return s.charAt(0).toUpperCase() + s.slice(1);
+  }
 };
 
-const CustomerProfile = () => {
-  const {
-    name,
-    id,
-    email,
-    phone,
-    totalOrders,
-    totalSpent,
-    joinDate,
-    status,
-    orderStats,
-    orderHistory,
-  } = fakeProfile;
+const CustomerProfile = ({ userId, onClose }) => {
+  const { data, isFetching } = useGetCustomerProfileQuery(userId, {
+    skip: !userId,
+  });
+  const [suspendUser, { isLoading: isSuspending }] = useSuspendUserMutation();
+  const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
+  const [activateUser, { isLoading: isActivating }] = useActivateUserMutation();
+  const name = data?.user_name || (data?.email || "").split("@")[0] || "";
+  const id = data?.user_id;
+  const email = data?.email || "";
+  const phone = data?.phone || "";
+  const totalOrders = data?.total_order ?? 0;
+  const totalSpent = data?.total_spent ?? 0;
+  const joinDate = formatDate(data?.join_date || "");
+  const status = (data?.status || "").toLowerCase();
+  const orderStats = {
+    confirmed: data?.total_order_confirmed ?? 0,
+    delivered: data?.total_order_deliveried ?? 0,
+    returned: data?.total_order_returned ?? 0,
+  };
+  const orderHistory = data?.order_history ?? [];
+
+  const confirmAction = (title, action) => {
+    Modal.confirm({
+      title,
+      content: `Are you sure you want to ${String(title || "").toLowerCase()} this user?`,
+      okText: title,
+      cancelText: "Cancel",
+      okButtonProps: { danger: title === "Delete" },
+      onOk: async () => {
+        await action();
+      },
+    });
+  };
+
+  const handleSuspend = () => {
+    if (!userId) return;
+    confirmAction("Suspend", async () => {
+      await suspendUser(userId).unwrap();
+      message.success("User suspended successfully");
+    });
+  };
+
+  const handleBan = () => {
+    if (!userId) return;
+    confirmAction("Ban", async () => {
+      await suspendUser(userId).unwrap();
+      message.success("User banned successfully");
+    });
+  };
+
+  const handleDelete = () => {
+    if (!userId) return;
+    confirmAction("Delete", async () => {
+      await deleteUser(userId).unwrap();
+      message.success("User deleted successfully");
+      if (onClose) onClose();
+    });
+  };
+
+  const handleActivate = () => {
+    if (!userId) return;
+    confirmAction("Activate", async () => {
+      await activateUser(userId).unwrap();
+      message.success("User activated successfully");
+    });
+  };
 
   return (
     <div className="space-y-6 md:space-y-8 lora">
@@ -266,13 +297,13 @@ const CustomerProfile = () => {
               >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
-                    <p className="text-gray-900">{order.id}</p>
-                    <p className="text-sm text-gray-500 mt-1">{order.date}</p>
+                    <p className="text-gray-900">Order ID: {order.order_id}</p>
+                    <p className="text-sm text-gray-500 mt-1">{formatDate(order.date || order.created_at)}</p>
                   </div>
 
                   <div className="text-right">
                     <p className="font-semibold text-gray-900">
-                      ${order.amount.toFixed(2)}
+                      ${Number(order.total_amount ?? 0).toFixed(2)}
                     </p>
                     <span
                       className={`inline-block mt-2 px-3 py-1 text-xs font-medium rounded-full border ${getOrderStatusStyle(
@@ -291,18 +322,53 @@ const CustomerProfile = () => {
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-3 md:gap-4 pt-4 border-t border-gray-200">
-        <button className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-yellow-100 text-black hover:bg-yellow-200 transition-colors">
-          <Ban size={20} />
-          Suspend Account
-        </button>
-        <button className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#E7000B] text-white transition-colors">
-          <Ban size={20} />
-          Ban User
-        </button>
-        <button className=" flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gray-800 text-white hover:bg-gray-900 transition-colors">
-          <Trash2 size={20} />
-          Delete User
-        </button>
+        {status === "inactive" ? (
+          <>
+            <button
+              onClick={handleActivate}
+              disabled={isActivating}
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              <Check size={20} />
+              Activate User
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className=" flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gray-800 text-white hover:bg-gray-900 transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={20} />
+              Delete User
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={handleSuspend}
+              disabled={isSuspending}
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-yellow-100 text-black hover:bg-yellow-200 transition-colors disabled:opacity-50"
+            >
+              <Ban size={20} />
+              Suspend Account
+            </button>
+            <button
+              onClick={handleBan}
+              disabled={isSuspending}
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#E7000B] text-white transition-colors disabled:opacity-50"
+            >
+              <Ban size={20} />
+              Ban User
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className=" flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gray-800 text-white hover:bg-gray-900 transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={20} />
+              Delete User
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

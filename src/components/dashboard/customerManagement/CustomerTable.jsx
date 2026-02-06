@@ -1,5 +1,6 @@
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
+import { formatDate } from "../../../lib/format/date";
 
 const getStatusStyle = (status) => {
   switch (status) {
@@ -71,7 +72,7 @@ const CustomerTable = ({ paginatedCustomers, handleViewProfile }) => {
                   ${customer.totalSpent.toFixed(2)}
                 </td>
                 <td className="px-6 py-4 text-center text-gray-600">
-                  {customer.joinDate}
+                  {formatDate(customer.joinDate)}
                 </td>
                 <td className="px-6 py-4 text-center">
                   <span
@@ -148,7 +149,7 @@ const CustomerTable = ({ paginatedCustomers, handleViewProfile }) => {
                   </div>
                   <div>
                     <div className="text-sm text-gray-500">Join Date</div>
-                    <div className="font-medium">{customer.joinDate}</div>
+                    <div className="font-medium">{formatDate(customer.joinDate)}</div>
                   </div>
                 </div>
                 <div className="pt-2">

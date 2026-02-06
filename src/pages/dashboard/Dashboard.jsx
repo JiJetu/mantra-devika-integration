@@ -1,9 +1,15 @@
 import { DollarSign, Users, Eye, ShoppingBag } from "lucide-react";
-import { dashboardFakeData } from "../../data/dashboardData";
 import StatCard from "../../components/dashboard/home/StatCard";
 import DashboardChart from "../../components/dashboard/home/DashboardChart";
 import Heading from "../../components/shared/Heading";
 import CustomSelect from "../../components/ui/CustomSelect";
+import {
+  useGetDashboardStatsQuery,
+  useGetSalesTrendsQuery,
+  useGetOrderStatusQuery,
+  useGetMostVisitedPagesQuery,
+  useGetProductEngagementInsightsQuery,
+} from "../../redux/features/dashboard/dashboard.api";
 
 const COLORS = [
   "#3B82F6", // blue - Confirmed
@@ -14,10 +20,75 @@ const COLORS = [
 ];
 
 const Dashboard = () => {
-  const data = dashboardFakeData;
+  const { data: stats } = useGetDashboardStatsQuery();
+  const { data: trends } = useGetSalesTrendsQuery();
+  const { data: orderStatusRaw } = useGetOrderStatusQuery();
+  const { data: mostVisitedRaw } = useGetMostVisitedPagesQuery();
+  const { data: engagementRaw } = useGetProductEngagementInsightsQuery();
 
-  // For progress bars
-  const maxVisits = Math.max(...data.mostVisitedPages.map((p) => p.visits));
+  const pickList = (raw) => {
+    if (Array.isArray(raw)) return raw;
+    const keys = [
+      "last_7_days",
+      "last_30_days",
+      "this_month",
+      "this_year",
+      "results",
+      "items",
+      "data",
+      "list",
+    ];
+    for (const k of keys) {
+      if (Array.isArray(raw?.[k])) return raw[k];
+    }
+    const first = Object.keys(raw || {}).find((k) => Array.isArray(raw[k]));
+    return first ? raw[first] : [];
+  };
+
+  const summary = {
+    totalRevenue: stats?.total_revinue ?? 0,
+    revenueChange: 0,
+    totalSales: stats?.total_sells ?? 0,
+    salesChange: 0,
+    totalCustomers: stats?.total_customers ?? 0,
+    customersChange: 0,
+    websiteVisitors: stats?.website_visits ?? 0,
+    visitorsChange: 0,
+  };
+
+  const salesTrend = pickList(trends?.last_7_days ?? trends).map((d) => ({
+    day: d?.date ?? "",
+    value: d?.total_sales ?? 0,
+  }));
+
+  const orderStatus = (orderStatusRaw?.last_7_days?.breakdown ?? []).map(
+    (b) => ({
+      name: b?.status ?? "",
+      value: b?.count ?? 0,
+    })
+  );
+
+  const mostVisitedPages = pickList(
+    mostVisitedRaw?.last_7_days ?? mostVisitedRaw
+  ).map((item) => ({
+    rank: item?.rank ?? 0,
+    page: item?.page ?? item?.path ?? "Unknown",
+    visits: item?.visit_count ?? item?.visits ?? item?.count ?? 0,
+  }));
+
+  const productEngagement = pickList(
+    engagementRaw?.last_7_days ?? engagementRaw
+  ).map((item) => ({
+    product: item?.product_name ?? item?.product ?? item?.name ?? "Unknown",
+    views: item?.views ?? 0,
+    clicks: item?.clicks ?? 0,
+    addToCart: item?.add_to_cart ?? item?.addToCart ?? 0,
+  }));
+
+  const maxVisits = Math.max(
+    1,
+    ...mostVisitedPages.map((p) => p.visits ?? 0)
+  );
 
   return (
     <div className="space-y-6 md:space-y-8 lg:space-y-10 p-4 md:p-6 lg:p-8 bg-[#fbf9f7] min-h-screen lora">
@@ -30,8 +101,8 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 md:gap-6">
         <StatCard
           title="Total Revenue"
-          value={`$${data.summary.totalRevenue.toLocaleString()}`}
-          change={data.summary.revenueChange}
+          value={`$${summary.totalRevenue.toLocaleString()}`}
+          change={summary.revenueChange}
           icon={DollarSign}
           iconColor="text-blue-500"
           iconBg="bg-blue-100"
@@ -40,8 +111,8 @@ const Dashboard = () => {
 
         <StatCard
           title="Total Sales"
-          value={data.summary.totalSales.toLocaleString()}
-          change={data.summary.salesChange}
+          value={summary.totalSales.toLocaleString()}
+          change={summary.salesChange}
           icon={ShoppingBag}
           iconColor="text-red-500"
           iconBg="bg-red-100"
@@ -50,8 +121,8 @@ const Dashboard = () => {
 
         <StatCard
           title="Total Customers"
-          value={data.summary.totalCustomers.toLocaleString()}
-          change={data.summary.customersChange}
+          value={summary.totalCustomers.toLocaleString()}
+          change={summary.customersChange}
           icon={Users}
           iconColor="text-purple-500"
           iconBg="bg-purple-100"
@@ -60,8 +131,8 @@ const Dashboard = () => {
 
         <StatCard
           title="Website Visitors"
-          value={data.summary.websiteVisitors.toLocaleString()}
-          change={data.summary.visitorsChange}
+          value={summary.websiteVisitors.toLocaleString()}
+          change={summary.visitorsChange}
           icon={Eye}
           iconColor="text-orange-500"
           iconBg="bg-orange-100"
@@ -70,7 +141,7 @@ const Dashboard = () => {
       </div>
 
       {/* Charts */}
-      <DashboardChart COLORS={COLORS} salesTrend={data.salesTrend} orderStatus={data.orderStatus} />
+      <DashboardChart COLORS={COLORS} salesTrend={salesTrend} orderStatus={orderStatus} />
 
       {/* Bottom section - Most Visited + Product Engagement */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
@@ -89,7 +160,7 @@ const Dashboard = () => {
           </div>
 
           <div className="space-y-4 md:space-y-5">
-            {data.mostVisitedPages.map((item) => (
+            {mostVisitedPages.map((item) => (
               <div key={item.rank} className="flex items-center gap-3 md:gap-4">
                 <span className="bg-[#FFF8E6] text-right text-primary text-sm md:text-lg px-3 py-1 rounded-lg">
                   {item.rank}
@@ -139,7 +210,7 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {data.productEngagement.map((item, idx) => (
+                {productEngagement.map((item, idx) => (
                   <tr
                     key={idx}
                     className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50"

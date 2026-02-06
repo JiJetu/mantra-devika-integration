@@ -7,10 +7,14 @@ import { BsEye } from "react-icons/bs";
 import { Megaphone, Package, StickyNote } from "lucide-react";
 import { FiShoppingCart } from "react-icons/fi";
 import { MdPayment } from "react-icons/md";
-import { GiPreviousButton } from "react-icons/gi";
+import { useDispatch } from "react-redux";
+import { logout } from "../../redux/features/auth/auth.slice";
+import { baseApi } from "../../redux/api/base.api";
+import { persistor } from "../../redux/store";
 
 const DashboardSidebar = ({ collapsed = false }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const location = useLocation();
 
   const menuItems = [
@@ -46,8 +50,13 @@ const DashboardSidebar = ({ collapsed = false }) => {
     return location.pathname.startsWith(path);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("accessToken");
+  const handleLogout = async () => {
+    dispatch(logout());
+    await persistor.flush();
+    await persistor.purge();
+    localStorage.removeItem("persist:auth");
+    sessionStorage.clear();
+    dispatch(baseApi.util.resetApiState());
     navigate("/login", { replace: true });
   };
 

@@ -1,33 +1,53 @@
 import { useState } from "react";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search } from "lucide-react";
 import CustomerTable from "../../components/dashboard/customerManagement/CustomerTable";
 import Modal from "../../components/ui/Modal";
 import CustomerProfile from "../../components/dashboard/customerManagement/CustomerProfile";
-import fakeCustomers from "../../data/customerManagementData";
 import Heading from "../../components/shared/Heading";
+import Pagination from "../../components/shared/Pagination";
+import { useDebouncedValue } from "../../lib/hooks/useDebouncedValue";
+import {
+  useGetCustomersListQuery,
+  useSearchCustomersQuery,
+} from "../../redux/features/dashboard/customer.api";
 
 const CustomerManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedTerm = useDebouncedValue(searchTerm, 450);
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const itemsPerPage = 10;
 
-  // Filter customers
-  const filteredCustomers = fakeCustomers.filter(
-    (customer) =>
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.contact.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phone.includes(searchTerm),
-  );
+  const useSearch = debouncedTerm.trim().length > 0;
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedCustomers = filteredCustomers.slice(
-    startIndex,
-    startIndex + itemsPerPage,
-  );
+  const { data: listData, isFetching: isListLoading } =
+    useGetCustomersListQuery(
+      { page: currentPage, page_size: itemsPerPage },
+      { skip: useSearch },
+    );
+
+  const { data: searchData, isFetching: isSearchLoading } =
+    useSearchCustomersQuery(
+      { q: debouncedTerm, page: currentPage, page_size: itemsPerPage },
+      { skip: !useSearch },
+    );
+
+  const apiData = useSearch ? searchData : listData;
+  const loading = useSearch ? isSearchLoading : isListLoading;
+
+  const totalPages = apiData?.total_pages ?? 0;
+  const paginatedCustomers = (apiData?.results ?? []).map((c) => ({
+    id: c.id,
+    name:
+      c.user_name || (c.email || "").split("@")[0] || c.email || `User ${c.id}`,
+    contact: c.email,
+    phone: c.phone,
+    totalOrders: c.total_orders ?? 0,
+    totalSpent: c.total_spent ?? 0,
+    joinDate: c.join_date,
+    status: (c.status || "").toLowerCase(),
+  }));
 
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -74,57 +94,23 @@ const CustomerManagement = () => {
 
           {/* Scrollable table container */}
           <div className="w-full overflow-x-auto">
-            <CustomerTable
-              paginatedCustomers={paginatedCustomers}
-              handleViewProfile={handleViewProfile}
-            />
+            {loading ? (
+              <div className="p-6 text-center text-gray-500">Loading...</div>
+            ) : (
+              <CustomerTable
+                paginatedCustomers={paginatedCustomers}
+                handleViewProfile={handleViewProfile}
+              />
+            )}
           </div>
 
-          {/* Pagination + Showing text */}
-          <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 text-sm text-gray-600 border-t">
-            <div>
-              Showing {startIndex + 1} to{" "}
-              {Math.min(startIndex + itemsPerPage, filteredCustomers.length)} of{" "}
-              {filteredCustomers.length} users
-            </div>
-
-            <div className="flex items-center gap-2 mt-3 sm:mt-0">
-              <button
-                onClick={() => goToPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="p-2 rounded-md border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                <ChevronLeft size={18} />
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                (page) => (
-                  <button
-                    key={page}
-                    onClick={() => goToPage(page)}
-                    className={`
-                  px-3 py-1.5 rounded-md border border-gray-300 font-medium
-                  ${
-                    currentPage === page
-                      ? "bg-primary text-white border-primary"
-                      : "hover:bg-gray-50"
-                  }
-                `}
-                  >
-                    {page}
-                  </button>
-                ),
-              )}
-
-              <button
-                onClick={() => goToPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-md border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            pageSize={apiData?.page_size ?? itemsPerPage}
+            totalCount={apiData?.count ?? 0}
+            totalPages={totalPages}
+            onPageChange={goToPage}
+          />
         </div>
       </div>
 
@@ -135,7 +121,7 @@ const CustomerManagement = () => {
         title="Customer Profile"
         className="max-w-2xl lg:max-w-3xl"
       >
-        <CustomerProfile />
+        <CustomerProfile userId={selectedCustomerId} onClose={() => setIsModalOpen(false)} />
       </Modal>
     </>
   );

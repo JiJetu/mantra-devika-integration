@@ -5,7 +5,7 @@ export const authApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     login: builder.mutation({
       query: (credentials) => ({
-        url: "/auth/login/",
+        url: "/dashboard/admin-login/",
         method: "POST",
         body: credentials,
       }),
@@ -20,32 +20,32 @@ export const authApi = baseApi.injectEndpoints({
     }),
 
     // Forgot password: send OTP
-    sendOtp: builder.mutation({
-      query: ({ email }) => ({
-        url: "/auth/forget_passord",
-        method: "POST",
-        body: { email },
-      }),
-    }),
+    // sendOtp: builder.mutation({
+    //   query: ({ email }) => ({
+    //     url: "/auth/forget_passord",
+    //     method: "POST",
+    //     body: { email },
+    //   }),
+    // }),
 
     // Verify OTP
-    verifyOtp: builder.mutation({
-      query: ({ email, otp }) => ({
-        url: "/auth/veryfy_otp/",
-        method: "POST",
-        body: { email, otp },
-      }),
-    }),
+    // verifyOtp: builder.mutation({
+    //   query: ({ email, otp }) => ({
+    //     url: "/auth/veryfy_otp/",
+    //     method: "POST",
+    //     body: { email, otp },
+    //   }),
+    // }),
 
     // Reset password
-    resetPassword: builder.mutation({
-      query: ({ email, reset_token, password, retype_password }) => ({
-        url: "/auth/reset_password/",
-        method: "POST",
-        body: { email, reset_token, password, retype_password },
-      }),
-    }),
+    // resetPassword: builder.mutation({
+    //   query: ({ email, reset_token, password, retype_password }) => ({
+    //     url: "/auth/reset_password/",
+    //     method: "POST",
+    //     body: { email, reset_token, password, retype_password },
+    //   }),
+    // }),
   }),
 });
 
-export const { useLoginMutation, useSendOtpMutation, useVerifyOtpMutation, useResetPasswordMutation } = authApi;
+export const { useLoginMutation } = authApi;
