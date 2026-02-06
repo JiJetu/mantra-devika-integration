@@ -72,6 +72,9 @@ const ProductsManagement = () => {
     sold: p.sold,
     status: p.status,
     variants: p.product_variant ?? [],
+    initialStock:
+      (typeof p.current_stock === "number" ? p.current_stock : 0) +
+      (typeof p.sold === "number" ? p.sold : 0),
   }));
 
   const goToPage = (page) => {
@@ -100,6 +103,11 @@ const ProductsManagement = () => {
       },
     });
   };
+
+  const hasInitialStock = products.some(
+    (p) => typeof p.initialStock === "number" && p.initialStock > 0,
+  );
+  const columnCount = 6 + (hasInitialStock ? 2 : 0);
 
   return (
     <>
@@ -224,12 +232,22 @@ const ProductsManagement = () => {
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
                     Price
                   </th>
+                  {hasInitialStock && (
+                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
+                      Initial Stock
+                    </th>
+                  )}
                   <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                     Current Stock
                   </th>
                   <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                     Sold
                   </th>
+                  {hasInitialStock && (
+                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
+                      Stock Status
+                    </th>
+                  )}
                   <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                     Status
                   </th>
@@ -241,19 +259,27 @@ const ProductsManagement = () => {
               <tbody className="divide-y divide-gray-100">
                 {isFetching ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-6 text-center text-gray-500">
+                    <td
+                      colSpan={columnCount}
+                      className="px-6 py-6 text-center text-gray-500"
+                    >
                       Loading...
                     </td>
                   </tr>
                 ) : products.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-6 text-center text-gray-500">
+                    <td
+                      colSpan={columnCount}
+                      className="px-6 py-6 text-center text-gray-500"
+                    >
                       No products found.
                     </td>
                   </tr>
                 ) : (
                   products.map((product) => {
-                    const soldPercent = 0; // no initial stock data
+                    const initial = Number(product.initialStock) || 0;
+                    const soldPercent =
+                      initial > 0 ? 100 - (Number(product.sold) / initial) * 100 : 0;
 
                     return (
                       <tr
@@ -280,6 +306,11 @@ const ProductsManagement = () => {
                         <td className="px-6 py-4 text-center font-medium text-gray-900">
                           ${Number(product.price).toFixed(2)}
                         </td>
+                        {hasInitialStock && (
+                          <td className="px-6 py-4 text-center text-gray-600">
+                            {initial}
+                          </td>
+                        )}
                         <td
                           className={`px-6 py-4 text-center font-medium ${Number(product.currentStock) < 50 ? "text-red-600" : "text-gray-900"}`}
                         >
@@ -293,6 +324,21 @@ const ProductsManagement = () => {
                             </span>
                           </div>
                         </td>
+                        {hasInitialStock && (
+                          <td className="px-6 py-4 text-center">
+                            <span className="flex items-center gap-1">
+                              <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full ${getProgressColor(soldPercent)} transition-all`}
+                                  style={{ width: `${soldPercent}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-gray-500">
+                                {soldPercent.toFixed(1)}%
+                              </span>
+                            </span>
+                          </td>
+                        )}
                         <td className="px-6 py-4 text-center">
                           <span
                             className={`inline-block px-3.5 py-1 text-xs font-medium rounded-full border ${statusBadge(product.status)}`}
