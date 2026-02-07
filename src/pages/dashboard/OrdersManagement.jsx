@@ -3,8 +3,6 @@ import {
   Search,
   Eye,
   CircleCheckBig,
-  Tractor,
-  Van,
   Package,
   Split,
   ShieldHalf,
@@ -14,88 +12,33 @@ import Modal from "../../components/ui/Modal";
 import OrderDetailsModalContent from "../../components/dashboard/ordersManagement/OrderDetailsModalContent";
 import RefundOrderDetailsModalContent from "../../components/dashboard/ordersManagement/RefundOrderDetailsModalContent";
 import CustomSelect from "../../components/ui/CustomSelect";
+import Pagination from "../../components/shared/Pagination";
+import { useListOrdersQuery, useSearchOrdersQuery } from "../../redux/features/dashboard/order";
+import { useDebouncedValue } from "../../lib/hooks/useDebouncedValue";
 
-// Fake data (replace with API later)
-const fakeOrders = [
-  {
-    id: "ORD-2024-001",
-    customer: "John Doe",
-    email: "john@example.com",
-    date: "2024-01-05",
-    total: 139.97,
-    type: "Registered",
-    agent: "Safi Mahmud",
-    status: "confirmed",
-    address: "San Francisco, CA",
-    apartment: "416/1",
-    country: "India",
-    items: [
-      { name: "Classic T-Shirt", quantity: 2, size: "S", price: 59.98 },
-      { name: "Denim Jeans", quantity: 1, size: "M", price: 79.99 },
-    ],
-    refundRequested: false,
-  },
-  {
-    id: "ORD-2024-002",
-    customer: "Jane Smith",
-    email: "jane@example.com",
-    date: "2024-01-04",
-    total: 99.99,
-    type: "Guest",
-    agent: "Joy Molik",
-    status: "in Transit",
-    address: "New York, NY",
-    apartment: "Apt 12",
-    country: "USA",
-    items: [{ name: "Premium Kurta", quantity: 1, size: "L", price: 99.99 }],
-    refundRequested: false,
-  },
-  {
-    id: "ORD-2024-003",
-    customer: "Mike Johnson",
-    email: "mike@example.com",
-    date: "2024-01-03",
-    total: 209.96,
-    type: "Registered",
-    agent: "Joy Molik",
-    status: "delivered",
-    address: "House 7, London",
-    apartment: "Flat 3B",
-    country: "UK",
-    items: [{ name: "Leather Jacket", quantity: 1, size: "XL", price: 209.96 }],
-    refundRequested: true,
-    refundMessage: "I got the wrong product.",
-    refundAttachments: ["product_screenshot.jpg"],
-  },
-  {
-    id: "ORD-2024-004",
-    customer: "Sarah Williams",
-    email: "sarah@example.com",
-    date: "2024-01-02",
-    total: 29.99,
-    type: "Guest",
-    agent: "Safi Mahmud",
-    status: "delivered",
-    address: "Flat 3B, Sydney",
-    apartment: "Unit 5A",
-    country: "Australia",
-    items: [{ name: "Classic T-Shirt", quantity: 1, size: "M", price: 29.99 }],
-    refundRequested: false,
-  },
-];
+const formatDate = (d) => {
+  try {
+    return new Date(d).toLocaleString();
+  } catch {
+    return String(d || "");
+  }
+};
 
 const getStatusStyle = (status) => {
-  switch (status) {
-    case "confirmed":
+  const s = String(status || "").toUpperCase();
+  switch (s) {
+    case "CONFIRMED":
       return ["bg-blue-100 text-blue-700", CircleCheckBig];
-    case "processed":
+    case "PROCESSED":
       return ["bg-orange-100 text-orange-700", ShieldHalf];
-    case "dispatched":
+    case "DISPATCHED":
       return ["bg-indigo-100 text-indigo-700", Split];
-    case "delivered":
+    case "DELIVERED":
       return ["bg-green-100 text-green-700", Package];
-    case "in Transit":
-      return ["bg-yellow-100 text-yellow-700", Van];
+    case "PAID":
+      return ["bg-blue-100 text-blue-700", CircleCheckBig];
+    case "PENDING":
+      return ["bg-yellow-100 text-yellow-700", CircleCheckBig];
     default:
       return ["bg-gray-100 text-gray-700", null];
   }
@@ -103,15 +46,42 @@ const getStatusStyle = (status) => {
 
 const OrdersManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedTerm = useDebouncedValue(searchTerm, 450);
   const [modalType, setModalType] = useState(null); // 'details' | 'refund'
   const [selectedOrder, setSelectedOrder] = useState(null);
-
-  const filteredOrders = fakeOrders.filter(
-    (order) =>
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.email.toLowerCase().includes(searchTerm.toLowerCase()),
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const searchEnabled = !!debouncedTerm;
+  const { data: listData, isFetching: isFetchingList } = useListOrdersQuery(
+    { page: currentPage, page_size: itemsPerPage },
+    { skip: searchEnabled }
   );
+  const { data: searchData, isFetching: isFetchingSearch } = useSearchOrdersQuery(
+    { page: currentPage, page_size: itemsPerPage, q: debouncedTerm },
+    { skip: !searchEnabled }
+  );
+  const data = searchEnabled ? searchData : listData;
+  const isFetching = searchEnabled ? isFetchingSearch : isFetchingList;
+  const totalPages = data?.total_pages ?? 0;
+  const orders = (data?.results ?? []).map((o) => ({
+    id: o.order_id,
+    customer: o.customer_name,
+    email: o.customer_email,
+    date: o.date,
+    total: o.grand_total ?? o.total_amount,
+    type: o.customer_user_type,
+    agent: o.order_country ?? "",
+    status: o.order_status,
+    items: (o.order_items ?? []).map((i) => ({
+      name: i.product_name,
+      quantity: i.quantity,
+      size: i.size,
+      price: i.subtotal,
+    })),
+    refundRequested: Boolean(o.is_applyed_for_refund),
+  }));
+
+  const filteredOrders = orders;
 
   const openModal = (type, order) => {
     setModalType(type);
@@ -196,13 +166,25 @@ const OrdersManagement = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredOrders.map((order) => (
+                {isFetching ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-6 text-center text-gray-500">
+                      Loading...
+                    </td>
+                  </tr>
+                ) : filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-6 text-center text-gray-500">
+                      No orders found.
+                    </td>
+                  </tr>
+                ) : filteredOrders.map((order) => (
                   <tr
                     key={order.id}
                     className="hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-4 font-medium text-gray-900 flex flex-col">
-                      {order.id}
+                      Order iD-{order.id}
                       {order.refundRequested && (
                         <span className="text-red-500 hover:text-red-700 text-sm mt-1 font-normal">
                           ⚠️ Refund Requested
@@ -213,14 +195,14 @@ const OrdersManagement = () => {
                       <div>{order.customer}</div>
                       <div className="text-sm text-gray-500">{order.email}</div>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{order.date}</td>
+                    <td className="px-6 py-4 text-gray-600">{formatDate(order.date)}</td>
                     <td className="px-6 py-4 text-center font-medium text-gray-900">
-                      ${order.total.toFixed(2)}
+                      ${Number(order.total ?? 0).toFixed(2)}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span
                         className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${
-                          order.type === "Registered"
+                          String(order.type).toLowerCase() === "registered"
                             ? "bg-purple-100 text-purple-700"
                             : "bg-gray-100 text-gray-700"
                         }`}
@@ -265,6 +247,15 @@ const OrdersManagement = () => {
             </table>
           </div>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          pageSize={data?.page_size ?? itemsPerPage}
+          totalCount={data?.count ?? 0}
+          totalPages={totalPages}
+          onPageChange={(p) => {
+            if (p >= 1 && p <= totalPages) setCurrentPage(p);
+          }}
+        />
       </div>
 
       {/* Modals */}

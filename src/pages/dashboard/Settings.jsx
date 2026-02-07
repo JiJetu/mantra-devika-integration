@@ -8,13 +8,13 @@ const Settings = () => {
   const [activeTab, setActiveTab] = useState("terms");
   const [isEditing, setIsEditing] = useState(false);
   const editor = useRef(null);
-  
+
   // Store original content to revert on cancel
   const [originalContent, setOriginalContent] = useState({
     terms: { title: "", content: "" },
     privacy: { title: "", content: "" },
     shipping: { title: "", content: "" },
-    refund: { title: "", content: "" }
+    refund: { title: "", content: "" },
   });
 
   // Fake data - will be replaced with API data later
@@ -29,7 +29,7 @@ const Settings = () => {
         <li>Pharetra nunc morbi elementum magnis convallis arcu enim tortor.</li>
       </ul>
       <p>Cursus a sed tortor enim imperdiet mauris. Sem morbi non semper eget cursus vulputate id volutpat quis.</p>
-    `
+    `,
   });
 
   const [privacyData, setPrivacyData] = useState({
@@ -45,7 +45,7 @@ const Settings = () => {
         <li>Cookies and tracking data</li>
       </ul>
       <p>Pharetra nunc morbi elementum magnis convallis arcu enim tortor. Cursus a sed tortor enim imperdiet mauris.</p>
-    `
+    `,
   });
 
   const [shippingData, setShippingData] = useState({
@@ -66,7 +66,7 @@ const Settings = () => {
       
       <h3>International Shipping</h3>
       <p>We ship to most countries worldwide. International delivery typically takes 10-14 business days. Additional customs duties and taxes may apply.</p>
-    `
+    `,
   });
 
   const [refundData, setRefundData] = useState({
@@ -100,19 +100,19 @@ const Settings = () => {
         <li>Intimate apparel (for hygiene reasons)</li>
         <li>Items marked as "Final Sale"</li>
       </ul>
-    `
+    `,
   });
 
   // Store current content in ref to avoid re-renders
   const [currentContent, setCurrentContent] = useState({
     title: "",
-    content: ""
+    content: "",
   });
 
   // Update current content when tab changes or editing starts
   useEffect(() => {
     let data;
-    switch(activeTab) {
+    switch (activeTab) {
       case "terms":
         data = termsData;
         break;
@@ -128,16 +128,16 @@ const Settings = () => {
       default:
         data = termsData;
     }
-    
+
     setCurrentContent({
       title: data.title,
-      content: data.content
+      content: data.content,
     });
-    
+
     if (isEditing) {
-      setOriginalContent(prev => ({
+      setOriginalContent((prev) => ({
         ...prev,
-        [activeTab]: { ...data }
+        [activeTab]: { ...data },
       }));
     }
   }, [activeTab, isEditing, termsData, privacyData, shippingData, refundData]);
@@ -151,11 +151,30 @@ const Settings = () => {
     showWordsCounter: false,
     showXPathInStatusbar: false,
     buttons: [
-      "bold", "italic", "underline", "strikethrough",
-      "|", "ul", "ol", "outdent", "indent",
-      "|", "font", "fontsize", "brush", "paragraph",
-      "|", "align", "undo", "redo", "|", "hr",
-      "|", "fullsize", "preview", "print"
+      "bold",
+      "italic",
+      "underline",
+      "strikethrough",
+      "|",
+      "ul",
+      "ol",
+      "outdent",
+      "indent",
+      "|",
+      "font",
+      "fontsize",
+      "brush",
+      "paragraph",
+      "|",
+      "align",
+      "undo",
+      "redo",
+      "|",
+      "hr",
+      "|",
+      "fullsize",
+      "preview",
+      "print",
     ],
     buttonsMD: "bold,italic,underline,|,ul,ol,|,font,fontsize,|,align",
     buttonsSM: "bold,italic,underline,|,ul,ol,|,align",
@@ -166,19 +185,19 @@ const Settings = () => {
     placeholder: "Start typing here...",
     style: {
       fontSize: "16px",
-      fontFamily: "inherit"
+      fontFamily: "inherit",
     },
     autofocus: false,
     events: {
-      afterInit: function(editor) {
+      afterInit: function (editor) {
         // You can add custom initialization here if needed
-      }
-    }
+      },
+    },
   };
 
   // Get active data based on tab
   const getActiveData = () => {
-    switch(activeTab) {
+    switch (activeTab) {
       case "terms":
         return termsData;
       case "privacy":
@@ -194,52 +213,52 @@ const Settings = () => {
 
   // Handle title change
   const handleTitleChange = (e) => {
-    setCurrentContent(prev => ({
+    setCurrentContent((prev) => ({
       ...prev,
-      title: e.target.value
+      title: e.target.value,
     }));
   };
 
   // Handle content change
   const handleContentChange = (newContent) => {
-    setCurrentContent(prev => ({
+    setCurrentContent((prev) => ({
       ...prev,
-      content: newContent
+      content: newContent,
     }));
   };
 
   // Handle save
   const handleSave = () => {
     // Update the actual state based on active tab
-    switch(activeTab) {
+    switch (activeTab) {
       case "terms":
         setTermsData({
           title: currentContent.title,
-          content: currentContent.content
+          content: currentContent.content,
         });
         break;
       case "privacy":
         setPrivacyData({
           title: currentContent.title,
-          content: currentContent.content
+          content: currentContent.content,
         });
         break;
       case "shipping":
         setShippingData({
           title: currentContent.title,
-          content: currentContent.content
+          content: currentContent.content,
         });
         break;
       case "refund":
         setRefundData({
           title: currentContent.title,
-          content: currentContent.content
+          content: currentContent.content,
         });
         break;
       default:
         break;
     }
-    
+
     toast.success(`${currentContent.title} saved successfully!`);
     setIsEditing(false);
   };
@@ -250,7 +269,7 @@ const Settings = () => {
     if (originalContent[activeTab]) {
       setCurrentContent({
         title: originalContent[activeTab].title,
-        content: originalContent[activeTab].content
+        content: originalContent[activeTab].content,
       });
     }
     setIsEditing(false);
@@ -259,13 +278,13 @@ const Settings = () => {
   // Handle edit button click
   const handleEditClick = () => {
     const data = getActiveData();
-    setOriginalContent(prev => ({
+    setOriginalContent((prev) => ({
       ...prev,
-      [activeTab]: { ...data }
+      [activeTab]: { ...data },
     }));
     setCurrentContent({
       title: data.title,
-      content: data.content
+      content: data.content,
     });
     setIsEditing(true);
   };
@@ -417,7 +436,9 @@ const Settings = () => {
               </p>
               <ul className="text-xs text-gray-500 list-disc pl-5 space-y-1">
                 <li>Use headings (H2, H3) to organize your policy sections</li>
-                <li>Use bullet points for lists and step-by-step instructions</li>
+                <li>
+                  Use bullet points for lists and step-by-step instructions
+                </li>
                 <li>Add bold text for important terms and conditions</li>
                 <li>Preview your content before saving</li>
               </ul>
@@ -442,19 +463,20 @@ const Settings = () => {
                 </span>
               </div>
             </div> */}
-            
+
             <div
               className="prose prose-sm md:prose-base lg:prose-lg max-w-none"
               dangerouslySetInnerHTML={{ __html: activeData.content }}
             />
-            
+
             <div className="mt-6 pt-4 border-t border-gray-200 text-sm text-gray-500">
               <div className="flex justify-between items-center">
                 <div>
-                  Last updated: {new Date().toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
+                  Last updated:{" "}
+                  {new Date().toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
                   })}
                 </div>
                 <div className="text-xs">

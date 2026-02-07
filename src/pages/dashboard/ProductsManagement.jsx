@@ -20,6 +20,7 @@ import CustomSelect from "../../components/ui/CustomSelect";
 import Pagination from "../../components/shared/Pagination";
 import { useDebouncedValue } from "../../lib/hooks/useDebouncedValue";
 import { Modal as AntModal, message } from "antd";
+import { useListCategoriesQuery } from "../../redux/features/dashboard/category";
 import {
   useGetProductStatsQuery,
   useListProductsQuery,
@@ -60,6 +61,11 @@ const ProductsManagement = () => {
     q: debouncedTerm || undefined,
   });
   const [deleteProduct] = useDeleteProductMutation();
+  const { data: categoriesData, isFetching: isFetchingCategories } = useListCategoriesQuery();
+  const categoryOptions = [
+    "All Categories",
+    ...((categoriesData ?? []).map((c) => c.name)),
+  ];
 
   const totalPages = listData?.total_pages ?? 0;
   const products = (listData?.results ?? []).map((p) => ({
@@ -200,8 +206,8 @@ const ProductsManagement = () => {
 
           <div className="flex flex-col sm:flex-row gap-3">
             <CustomSelect
-              options={["All Categories", "Waistcoats", "Jackets", "Kurtas"]}
-              // placeholder="All Categories"
+              options={categoryOptions}
+              disabled={isFetchingCategories}
               className="w-full sm:w-44"
             />
             <CustomSelect
