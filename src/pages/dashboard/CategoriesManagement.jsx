@@ -1,67 +1,29 @@
 import { useState } from "react";
-import { Folder, Plus, SquarePen, Trash2 } from "lucide-react";
+import {  Plus, SquarePen, Trash2 } from "lucide-react";
 import Modal from "../../components/ui/Modal";
 import EditCategory from "../../components/dashboard/categoriesManagement/EditCategory";
 import AddCategory from "../../components/dashboard/categoriesManagement/AddCategory";
-import { IMAGES } from "../../assets";
 import SubCategoriesModal from "../../components/dashboard/categoriesManagement/SubCategoriesModal";
+import { useListCategoriesQuery, useDeleteCategoryMutation } from "../../redux/features/dashboard/category";
+import { message, Popconfirm } from "antd";
 
-// Fake data (replace with real API data later)
-const fakeCategories = [
-  {
-    id: 1,
-    name: "Waistcoats",
-    description: "Comfortable cotton Waistcoats",
-    productCount: 45,
-    status: "active",
-    image: IMAGES.product,
-  },
-  {
-    id: 2,
-    name: "Jacket",
-    description: "Premium quality Jacket",
-    productCount: 23,
-    status: "active",
-    image: "https://via.placeholder.com/80x80/5B0D0D/FFFBEF?text=J",
-  },
-  {
-    id: 3,
-    name: "Kurta",
-    description: "Premium quality Kurta",
-    productCount: 18,
-    status: "active",
-    image: "https://via.placeholder.com/80x80/5B0D0D/FFFBEF?text=K",
-  },
-  {
-    id: 4,
-    name: "Trouser",
-    description: "Comfortable cotton Trouser",
-    productCount: 32,
-    status: "active",
-    image: "https://via.placeholder.com/80x80/5B0D0D/FFFBEF?text=T",
-  },
-  {
-    id: 5,
-    name: "Trending Now",
-    description: "Most Popular product that you shouldn't miss",
-    productCount: 42,
-    status: "active",
-    image: "https://via.placeholder.com/80x80/5B0D0D/FFFBEF?text=TN",
-  },
-  {
-    id: 6,
-    name: "Latest Collection",
-    description: "Newest product that you shouldn't miss",
-    productCount: 21,
-    status: "active",
-    image: "https://via.placeholder.com/80x80/5B0D0D/FFFBEF?text=LC",
-  },
-];
+const sanitizeUrl = (u) => String(u || "").replace(/[`"]/g, "").trim();
 
 const CategoriesManagement = () => {
   const [modalType, setModalType] = useState(null); // 'add' | 'edit'
 
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const { data, isFetching } = useListCategoriesQuery();
+  const [deleteCategory] = useDeleteCategoryMutation();
+  const [deletingId, setDeletingId] = useState(null);
+  const categories = (data ?? []).map((c, idx) => ({
+    id: c.category_id ?? idx + 1,
+    name: c.name,
+    description: c.description || "",
+    productCount: c.total_number_of_product ?? 0,
+    status: c.is_active ? "active" : "inactive",
+    image: sanitizeUrl(c.photo),
+  }));
 
   const openModal = (type, category = null) => {
     setModalType(type);
@@ -71,6 +33,18 @@ const CategoriesManagement = () => {
   const closeModal = () => {
     setModalType(null);
     setSelectedCategory(null);
+  };
+
+  const handleDelete = async (id) => {
+    setDeletingId(id);
+    try {
+      await deleteCategory(id).unwrap();
+      message.success("Category deleted successfully");
+    } catch {
+      message.error("Failed to delete category");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -106,7 +80,11 @@ const CategoriesManagement = () => {
 
         {/* Category Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6 lg:gap-8">
-          {fakeCategories.map((category) => (
+          {isFetching ? (
+            <div className="col-span-3 p-6 text-center text-gray-500">Loading...</div>
+          ) : categories.length === 0 ? (
+            <div className="col-span-3 p-6 text-center text-gray-500">No categories found.</div>
+          ) : categories.map((category) => (
             <div
               key={category.id}
               className="bg-white rounded-xl shadow-sm border border-[#F9EFD5] p-5 md:p-6 hover:shadow-md transition-all duration-200 group"
@@ -114,9 +92,11 @@ const CategoriesManagement = () => {
               {/* Top section: Icon + Actions */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-4">
-                  <div className="p-3.5 bg-[#FFF8E6] rounded-lg">
-                    <Folder className="h-7 w-7 md:h-8 md:w-8 text-[#5B0D0D]" />
-                  </div>
+                  <img
+                    src={category.image}
+                    alt={category.name}
+                    className="w-10 h-10 md:w-12 md:h-12 object-cover rounded-lg border border-gray-200 bg-[#FFF8E6]"
+                  />
                   <div className="flex items-center gap-3 opacity-70 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => openModal("edit", category)}
@@ -124,9 +104,21 @@ const CategoriesManagement = () => {
                     >
                       <SquarePen size={18} />
                     </button>
-                    <button className="text-red-600 hover:text-red-800 transition-colors rounded">
-                      <Trash2 size={18} />
-                    </button>
+                    <Popconfirm
+                      title="Delete this category?"
+                      okText="Delete"
+                      cancelText="Cancel"
+                      okType="danger"
+                      onConfirm={() => handleDelete(category.id)}
+                      disabled={deletingId === category.id}
+                    >
+                      <button
+                        disabled={deletingId === category.id}
+                        className="text-red-600 hover:text-red-800 transition-colors rounded disabled:opacity-60"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </Popconfirm>
                   </div>
                 </div>
 

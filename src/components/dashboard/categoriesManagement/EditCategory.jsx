@@ -1,20 +1,22 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { X } from "lucide-react";
+import { useEditCategoryMutation } from "../../../redux/features/dashboard/category";
+import { message } from "antd";
 
 const EditCategory = ({ category, onClose }) => {
   const { register, handleSubmit, setValue } = useForm();
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null); // new file if uploaded
-  const [removeImage, setRemoveImage] = useState(false); // flag to tell backend to remove image
+  const [editCategory, { isLoading: isUpdating }] = useEditCategoryMutation();
 
   useEffect(() => {
     if (category) {
       setValue("name", category.name);
       setValue("description", category.description);
-      setPreviewImage(category.image); // show existing
+      setValue("is_active", category.status === "active");
+      setPreviewImage(category.image);
       setSelectedFile(null);
-      setRemoveImage(false);
     }
   }, [category, setValue]);
 
@@ -23,39 +25,30 @@ const EditCategory = ({ category, onClose }) => {
     if (file) {
       setSelectedFile(file);
       setPreviewImage(URL.createObjectURL(file));
-      setRemoveImage(false); // if new upload, no need to remove old one
     }
   };
 
   const handleRemovePreview = () => {
     setPreviewImage(null);
     setSelectedFile(null);
-    setRemoveImage(true); // tell backend: remove existing image
   };
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     const formData = new FormData();
-
     formData.append("name", data.name);
     formData.append("description", data.description);
-
+    formData.append("is_active", data.is_active ? "true" : "false");
     if (selectedFile) {
-      // New image uploaded → send it
-      formData.append("image", selectedFile);
-    } else if (removeImage) {
-      // User removed image → tell backend to clear it
-      formData.append("removeImage", "true");
+      formData.append("photo", selectedFile);
     }
-    // If neither → backend keeps existing image
-
-    console.log("Submitting FormData for edit:");
-    for (let [key, value] of formData.entries()) {
-      console.log(`${key}:`, value);
+    const categoryId = category?.id ?? category?.category_id;
+    try {
+      await editCategory({ categoryId, body: formData }).unwrap();
+      message.success("Category updated successfully");
+      onClose?.();
+    } catch (e) {
+      message.error("Failed to update category");
     }
-
-    // → axios.put(`/api/categories/${category.id}`, formData)
-
-    onClose?.();
   };
 
   return (
@@ -119,13 +112,19 @@ const EditCategory = ({ category, onClose }) => {
         )}
       </div>
 
+      <div className="flex items-center gap-2">
+        <input type="checkbox" {...register("is_active")} />
+        <span className="text-sm md:text-base text-gray-700">Active</span>
+      </div>
+
       {/* Buttons */}
       <div className="flex flex-col md:flex-row gap-4 pt-6">
         <button
           type="submit"
-          className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base"
+          disabled={isUpdating}
+          className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base disabled:opacity-60"
         >
-          Update Category
+          {isUpdating ? "Updating..." : "Update Category"}
         </button>
         <button
           type="button"

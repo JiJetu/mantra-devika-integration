@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { X } from "lucide-react";
+import { useCreateCategoryMutation } from "../../../redux/features/dashboard/category";
+import { message } from "antd";
 
-const AddCategory = () => {
+const AddCategory = ({ onClose }) => {
   const { register, handleSubmit, reset } = useForm();
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -20,29 +23,24 @@ const AddCategory = () => {
     setSelectedFile(null);
   };
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     const formData = new FormData();
-
-    // Add text fields
     formData.append("name", data.name);
     formData.append("description", data.description);
-
-    // Add image file (if selected)
+    formData.append("is_active", data.is_active ? "true" : "false");
     if (selectedFile) {
-      formData.append("image", selectedFile);
+      formData.append("photo", selectedFile);
     }
-
-    console.log("Submitting FormData:");
-    for (let [key, value] of formData.entries()) {
-      console.log(`${key}:`, value);
+    try {
+      await createCategory(formData).unwrap();
+      message.success("Category created successfully");
+      reset();
+      setPreviewImage(null);
+      setSelectedFile(null);
+      onClose?.();
+    } catch {
+      message.error("Failed to create category");
     }
-
-    // → Here you would do: axios.post('/api/categories', formData)
-
-    // Reset form after submit
-    reset();
-    setPreviewImage(null);
-    setSelectedFile(null);
   };
 
   return (
@@ -71,6 +69,11 @@ const AddCategory = () => {
           rows={4}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm md:text-base"
         />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input type="checkbox" {...register("is_active")} defaultChecked />
+        <span className="text-sm md:text-base text-gray-700">Active</span>
       </div>
 
       <div>
@@ -114,12 +117,14 @@ const AddCategory = () => {
       <div className="flex flex-col md:flex-row gap-4 pt-6">
         <button
           type="submit"
-          className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base"
+          disabled={isCreating}
+          className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base disabled:opacity-60"
         >
-          Add Category
+          {isCreating ? "Adding..." : "Add Category"}
         </button>
         <button
           type="button"
+          onClick={onClose}
           className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium text-base"
         >
           Cancel
