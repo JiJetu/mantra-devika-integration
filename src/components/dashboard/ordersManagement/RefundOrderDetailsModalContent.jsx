@@ -1,6 +1,22 @@
 import { AlertTriangle, Paperclip } from "lucide-react";
+import { message } from "antd";
+import { useUpdateRefundStatusMutation } from "../../../redux/features/dashboard/order";
 
 const RefundOrderDetailsModalContent = ({ order }) => {
+  const [updateRefundStatus, { isLoading }] = useUpdateRefundStatusMutation();
+  const refundId = order.refundId;
+  const onAction = async (status) => {
+    if (!refundId) {
+      message.error("Refund request ID is missing");
+      return;
+    }
+    try {
+      await updateRefundStatus({ refundId, status }).unwrap();
+      message.success(`Refund ${status.toLowerCase()} successfully`);
+    } catch {
+      message.error("Failed to update refund status");
+    }
+  };
   return (
     <div className="space-y-6 md:space-y-8 lora">
       {/* Same order info as above */}
@@ -133,10 +149,18 @@ const RefundOrderDetailsModalContent = ({ order }) => {
 
           {/* Approve / Reject */}
           <div className="flex flex-col sm:flex-row gap-4 mt-6">
-            <button className="px-6 py-3 bg-[#00A63E] text-white rounded-lg transition-colors font-medium text-sm">
+            <button
+              disabled={isLoading || !refundId}
+              onClick={() => onAction("APPROVED")}
+              className="px-6 py-3 bg-[#00A63E] text-white rounded-lg transition-colors font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            >
               Approve Refund
             </button>
-            <button className="px-6 py-3 bg-[#4A5565] text-white rounded-lg transition-colors font-medium text-sm">
+            <button
+              disabled={isLoading || !refundId}
+              onClick={() => onAction("REJECTED")}
+              className="px-6 py-3 bg-[#4A5565] text-white rounded-lg transition-colors font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            >
               Reject Refund
             </button>
           </div>

@@ -1,13 +1,30 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import JoditEditor from "jodit-react";
 import { Edit, Save, X } from "lucide-react";
-import Heading from "../../components/shared/Heading";
 import { toast } from "sonner";
+import {
+  useGetTermsPolicyQuery,
+  useUpsertTermsPolicyMutation,
+  useGetPrivacyPolicyQuery,
+  useUpsertPrivacyPolicyMutation,
+  useGetShippingPolicyQuery,
+  useUpsertShippingPolicyMutation,
+  useGetRefundPolicyQuery,
+  useUpsertRefundPolicyMutation,
+} from "../../redux/features/dashboard/policies";
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("terms");
   const [isEditing, setIsEditing] = useState(false);
   const editor = useRef(null);
+  const { data: termsAPI } = useGetTermsPolicyQuery();
+  const { data: privacyAPI } = useGetPrivacyPolicyQuery();
+  const { data: shippingAPI } = useGetShippingPolicyQuery();
+  const { data: refundAPI } = useGetRefundPolicyQuery();
+  const [upsertTerms, { isLoading: savingTerms }] = useUpsertTermsPolicyMutation();
+  const [upsertPrivacy, { isLoading: savingPrivacy }] = useUpsertPrivacyPolicyMutation();
+  const [upsertShipping, { isLoading: savingShipping }] = useUpsertShippingPolicyMutation();
+  const [upsertRefund, { isLoading: savingRefund }] = useUpsertRefundPolicyMutation();
 
   // Store original content to revert on cancel
   const [originalContent, setOriginalContent] = useState({
@@ -16,6 +33,21 @@ const Settings = () => {
     shipping: { title: "", content: "" },
     refund: { title: "", content: "" },
   });
+
+  useEffect(() => {
+    if (termsAPI?.policy) {
+      setTermsData((prev) => ({ ...prev, content: termsAPI.policy }));
+    }
+    if (privacyAPI?.policy) {
+      setPrivacyData((prev) => ({ ...prev, content: privacyAPI.policy }));
+    }
+    if (shippingAPI?.policy) {
+      setShippingData((prev) => ({ ...prev, content: shippingAPI.policy }));
+    }
+    if (refundAPI?.policy) {
+      setRefundData((prev) => ({ ...prev, content: refundAPI.policy }));
+    }
+  }, [termsAPI, privacyAPI, shippingAPI, refundAPI]);
 
   // Fake data - will be replaced with API data later
   const [termsData, setTermsData] = useState({
@@ -228,39 +260,45 @@ const Settings = () => {
   };
 
   // Handle save
-  const handleSave = () => {
-    // Update the actual state based on active tab
-    switch (activeTab) {
-      case "terms":
-        setTermsData({
-          title: currentContent.title,
-          content: currentContent.content,
-        });
-        break;
-      case "privacy":
-        setPrivacyData({
-          title: currentContent.title,
-          content: currentContent.content,
-        });
-        break;
-      case "shipping":
-        setShippingData({
-          title: currentContent.title,
-          content: currentContent.content,
-        });
-        break;
-      case "refund":
-        setRefundData({
-          title: currentContent.title,
-          content: currentContent.content,
-        });
-        break;
-      default:
-        break;
+  const handleSave = async () => {
+    try {
+      switch (activeTab) {
+        case "terms":
+          await upsertTerms(currentContent.content).unwrap();
+          setTermsData({
+            title: currentContent.title,
+            content: currentContent.content,
+          });
+          break;
+        case "privacy":
+          await upsertPrivacy(currentContent.content).unwrap();
+          setPrivacyData({
+            title: currentContent.title,
+            content: currentContent.content,
+          });
+          break;
+        case "shipping":
+          await upsertShipping(currentContent.content).unwrap();
+          setShippingData({
+            title: currentContent.title,
+            content: currentContent.content,
+          });
+          break;
+        case "refund":
+          await upsertRefund(currentContent.content).unwrap();
+          setRefundData({
+            title: currentContent.title,
+            content: currentContent.content,
+          });
+          break;
+        default:
+          break;
+      }
+      toast.success(`${currentContent.title} saved successfully!`);
+      setIsEditing(false);
+    } catch (error) {
+      toast.error("Failed to save policy");
     }
-
-    toast.success(`${currentContent.title} saved successfully!`);
-    setIsEditing(false);
   };
 
   // Handle cancel
@@ -376,7 +414,16 @@ const Settings = () => {
               <>
                 <button
                   onClick={handleSave}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm"
+                  disabled={
+                    activeTab === "terms"
+                      ? savingTerms
+                      : activeTab === "privacy"
+                      ? savingPrivacy
+                      : activeTab === "shipping"
+                      ? savingShipping
+                      : savingRefund
+                  }
+                  className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <Save size={16} />
                   Save Changes

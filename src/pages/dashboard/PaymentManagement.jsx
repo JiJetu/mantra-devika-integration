@@ -9,59 +9,23 @@ import {
 } from "lucide-react";
 import Heading from "../../components/shared/Heading";
 import CustomSelect from "../../components/ui/CustomSelect";
+import Pagination from "../../components/shared/Pagination";
+import { useGetPaymentSummaryQuery, useListPaymentsQuery, useSearchPaymentsQuery, useFilterPaymentsQuery } from "../../redux/features/dashboard/payment";
+import { useDebouncedValue } from "../../lib/hooks/useDebouncedValue";
 
-// Fake data (replace with API later)
-const fakePayments = [
-  {
-    id: "TXN-2024-001",
-    order: "ORD-2024-001",
-    customer: "John Doe",
-    amount: 139.97,
-    method: "Credit Card",
-    date: "2024-01-05 14:30",
-    status: "COMPLETED",
-  },
-  {
-    id: "TXN-2024-002",
-    order: "ORD-2024-002",
-    customer: "Jane Smith",
-    amount: 199.99,
-    method: "PayPal",
-    date: "2024-01-04 11:20",
-    status: "COMPLETED",
-  },
-  {
-    id: "TXN-2024-003",
-    order: "ORD-2024-003",
-    customer: "Mike Johnson",
-    amount: 209.96,
-    method: "Credit Card",
-    date: "2024-01-03 16:45",
-    status: "COMPLETED",
-  },
-  {
-    id: "TXN-2024-004",
-    order: "ORD-2024-004",
-    customer: "Sarah Williams",
-    amount: 29.99,
-    method: "Debit Card",
-    date: "2024-01-02 09:15",
-    status: "REFUNDED",
-  },
-  {
-    id: "TXN-2024-005",
-    order: "ORD-2024-005",
-    customer: "Tom Brown",
-    amount: 159.99,
-    method: "Bank Transfer",
-    date: "2024-01-06 10:00",
-    status: "PENDING",
-  },
-];
+const formatDate = (d) => {
+  try {
+    return new Date(d).toLocaleString();
+  } catch {
+    return String(d || "");
+  }
+};
 
 const getStatusStyle = (status) => {
-  switch (status) {
+  const s = String(status || "").toUpperCase();
+  switch (s) {
     case "COMPLETED":
+    case "COMPLETE":
       return ["bg-green-100 text-green-700 border-green-300", CircleCheckBig];
     case "PENDING":
       return ["bg-orange-100 text-orange-700 border-orange-300", Clock];
@@ -74,31 +38,43 @@ const getStatusStyle = (status) => {
 
 const PaymentManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Dynamic filtering (add more logic later)
-  const filteredPayments = fakePayments.filter(
-    (payment) =>
-      payment.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.order.toLowerCase().includes(searchTerm.toLowerCase()),
+  const [status, setStatus] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const { data: summary } = useGetPaymentSummaryQuery();
+  const debouncedTerm = useDebouncedValue(searchTerm, 450);
+  const searchEnabled = !!debouncedTerm;
+  const filterEnabled = !searchEnabled && !!status;
+  const { data: listData, isFetching: isFetchingList } = useListPaymentsQuery(
+    { page: currentPage, page_size: itemsPerPage },
+    { skip: searchEnabled || filterEnabled }
   );
-
-  // Stats (computed dynamically)
-  const totalTransactions = fakePayments.length;
-  const completed = fakePayments
-    .filter((p) => p.status === "COMPLETED")
-    .reduce((sum, p) => sum + p.amount, 0)
-    .toFixed(2);
-  const pending = fakePayments
-    .filter((p) => p.status === "PENDING")
-    .reduce((sum, p) => sum + p.amount, 0)
-    .toFixed(2);
-  const refunded = fakePayments
-    .filter((p) => p.status === "REFUNDED")
-    .reduce((sum, p) => sum + p.amount, 0)
-    .toFixed(2);
-
-  const totalAmount = fakePayments.reduce((sum, p) => sum + p.amount, 0);
+  const { data: searchData, isFetching: isFetchingSearch } = useSearchPaymentsQuery(
+    { q: debouncedTerm, page: currentPage, page_size: itemsPerPage },
+    { skip: !searchEnabled }
+  );
+  const { data: filterData, isFetching: isFetchingFilter } = useFilterPaymentsQuery(
+    { status, page: currentPage, page_size: itemsPerPage },
+    { skip: !filterEnabled }
+  );
+  const data = searchEnabled ? searchData : filterEnabled ? filterData : listData;
+  const isFetching = searchEnabled ? isFetchingSearch : filterEnabled ? isFetchingFilter : isFetchingList;
+  const totalPages = data?.total_pages ?? 0;
+  const rawPayments = data?.results ?? [];
+  const payments = rawPayments.map((p) => ({
+    id: p.transaction_id,
+    order: String(p.order_id),
+    customer: p.customer_name,
+    amount: Number(p.amount ?? 0),
+    method: p.payment_method,
+    date: formatDate(p.date),
+    status: String(p.status || "").toUpperCase() === "COMPLETE" ? "COMPLETED" : String(p.status || "").toUpperCase(),
+  }));
+  const filteredPayments = payments;
+  const totalAmount = Number(summary?.Total_Order_amount ?? 0);
+  const completed = Number(summary?.Total_Order_Completed_Amount ?? 0).toFixed(2);
+  const pending = Number(summary?.Total_Order_pending_Amount ?? 0).toFixed(2);
+  const refunded = Number(summary?.Total_order_Refund_Amount ?? 0).toFixed(2);
 
   return (
     <div className="space-y-6 md:space-y-8 lg:space-y-10 lora">
@@ -171,7 +147,17 @@ const PaymentManagement = () => {
         <div>
           <CustomSelect
             placeholder="All Status"
-            options={["All Status", "Completed", "Pending", "Refunded"]}
+            options={[
+              { value: "", label: "All Status" },
+              { value: "Complete", label: "Completed" },
+              { value: "Pending", label: "Pending" },
+              { value: "Refund", label: "Refunded" },
+            ]}
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setCurrentPage(1);
+            }}
             className="min-w-[180px]"
           />
         </div>
@@ -207,7 +193,19 @@ const PaymentManagement = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredPayments.map((payment) => (
+              {isFetching ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-6 text-center text-gray-500">
+                    Loading...
+                  </td>
+                </tr>
+              ) : filteredPayments.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-6 text-center text-gray-500">
+                    No payments found.
+                  </td>
+                </tr>
+              ) : filteredPayments.map((payment) => (
                 <tr
                   key={payment.id}
                   className="hover:bg-gray-50 transition-colors"
@@ -247,6 +245,15 @@ const PaymentManagement = () => {
           </table>
         </div>
       </div>
+      <Pagination
+        currentPage={currentPage}
+        pageSize={listData?.page_size ?? itemsPerPage}
+        totalCount={listData?.count ?? 0}
+        totalPages={totalPages}
+        onPageChange={(p) => {
+          if (p >= 1 && p <= totalPages) setCurrentPage(p);
+        }}
+      />
     </div>
   );
 };

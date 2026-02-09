@@ -2,74 +2,34 @@
 import { useState } from "react";
 import { Search, Flame, Eye } from "lucide-react";
 import Heading from "../../components/shared/Heading";
+import { useGetProductPopularityQuery, useSearchProductPopularityQuery } from "../../redux/features/dashboard/popularity";
+import { useDebouncedValue } from "../../lib/hooks/useDebouncedValue";
 
-// Fake data (replace with real API data later)
-const fakeProductPopularity = [
-  {
-    rank: 1,
-    name: "Jaipuri Sherwani",
-    views: 468,
-    viewsIn48: 468,
-    isHot: true,
-  },
-  {
-    rank: 2,
-    name: "Denim Jeans",
-    views: 356,
-    viewsIn48: 100,
-    isHot: true,
-  },
-  {
-    rank: 3,
-    name: "Leather Jacket",
-    views: 298,
-    viewsIn48: 150,
-    isHot: true,
-  },
-  {
-    rank: 4,
-    name: "Running Shoes",
-    views: 267,
-    viewsIn48: 200,
-    isHot: false,
-  },
-  {
-    rank: 5,
-    name: "Casual Shirt",
-    views: 245,
-    viewsIn48: 120,
-    isHot: false,
-  },
-  {
-    rank: 6,
-    name: "Sports Cap",
-    views: 187,
-        viewsIn48: 80,
-    isHot: false,
-  },
-  {
-    rank: 7,
-    name: "Sneakers",
-    views: 165,
-    viewsIn48: 60,
-    isHot: false,
-  },
-  {
-    rank: 8,
-    name: "Hoodie",
-    views: 142,
-    viewsIn48: 70,
-    isHot: false,
-  },
-];
+const mapPopularity = (items = []) =>
+  items.map((p) => ({
+    rank: p.rank,
+    name: p.product_name,
+    views: p.total_views,
+    viewsIn48: p.total_views_48hr,
+    isHot: Boolean(p.is_hot),
+  }));
 
 const ProductPopularity = () => {
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Simple client-side filtering
-  const filteredProducts = fakeProductPopularity.filter((product) =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const debouncedTerm = useDebouncedValue(searchTerm, 450);
+  const searchEnabled = !!debouncedTerm;
+  const { data: listData, isFetching: isFetchingList } = useGetProductPopularityQuery(undefined, {
+    skip: searchEnabled,
+  });
+  const { data: searchData, isFetching: isFetchingSearch } = useSearchProductPopularityQuery(
+    { q: debouncedTerm },
+    { skip: !searchEnabled },
   );
+  const raw = searchEnabled ? searchData : listData;
+  const isFetching = searchEnabled ? isFetchingSearch : isFetchingList;
+  const products = mapPopularity(raw ?? []);
+
+  const filteredProducts = products;
 
   return (
     <div className="space-y-6 md:space-y-8 lg:space-y-10 lora">
@@ -114,7 +74,19 @@ const ProductPopularity = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredProducts.map((product) => (
+              {isFetching ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-6 text-center text-gray-500">
+                    Loading...
+                  </td>
+                </tr>
+              ) : filteredProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-6 text-center text-gray-500">
+                    No products found.
+                  </td>
+                </tr>
+              ) : filteredProducts.map((product) => (
                 <tr key={product.rank} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 font-medium text-primary">
                     <span className="bg-gradient-to-r from-[#DBEAFE] to-[#F3E8FF] px-3 py-1 rounded-lg">{product.rank}</span>

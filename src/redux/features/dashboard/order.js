@@ -29,7 +29,42 @@ export const orderApi = baseApi.injectEndpoints({
       },
       providesTags: ["Orders"],
     }),
+    filterOrders: builder.query({
+      query: ({ page = 1, page_size = 10, status } = {}) => {
+        const params = new URLSearchParams();
+        params.set("page", String(page));
+        params.set("page_size", String(page_size));
+        if (status) params.set("status", String(status));
+        return {
+          url: `/dashboard/order-management/orders/filter/?${params.toString()}`,
+          method: "GET",
+        };
+      },
+      providesTags: ["Orders"],
+    }),
+    updateOrderStatus: builder.mutation({
+      query: ({ orderId, status }) => ({
+        url: `/dashboard/order-management/orders/${orderId}/status/`,
+        method: "PATCH",
+        body: { status },
+      }),
+      invalidatesTags: ["Orders"],
+    }),
+    updateRefundStatus: builder.mutation({
+      query: ({ refundId, status }) => ({
+        url: `/dashboard/order-management/refunds/${refundId}/status/`,
+        method: "PATCH",
+        body: { status },
+      }),
+      invalidatesTags: ["Orders"],
+    }),
   }),
 });
 
-export const { useListOrdersQuery, useSearchOrdersQuery } = orderApi;
+export const {
+  useListOrdersQuery,
+  useSearchOrdersQuery,
+  useFilterOrdersQuery,
+  useUpdateOrderStatusMutation,
+  useUpdateRefundStatusMutation,
+} = orderApi;

@@ -13,7 +13,7 @@ import OrderDetailsModalContent from "../../components/dashboard/ordersManagemen
 import RefundOrderDetailsModalContent from "../../components/dashboard/ordersManagement/RefundOrderDetailsModalContent";
 import CustomSelect from "../../components/ui/CustomSelect";
 import Pagination from "../../components/shared/Pagination";
-import { useListOrdersQuery, useSearchOrdersQuery } from "../../redux/features/dashboard/order";
+import { useListOrdersQuery, useSearchOrdersQuery, useFilterOrdersQuery } from "../../redux/features/dashboard/order";
 import { useDebouncedValue } from "../../lib/hooks/useDebouncedValue";
 
 const formatDate = (d) => {
@@ -27,11 +27,9 @@ const formatDate = (d) => {
 const getStatusStyle = (status) => {
   const s = String(status || "").toUpperCase();
   switch (s) {
-    case "CONFIRMED":
-      return ["bg-blue-100 text-blue-700", CircleCheckBig];
-    case "PROCESSED":
+    case "PROCESSING":
       return ["bg-orange-100 text-orange-700", ShieldHalf];
-    case "DISPATCHED":
+    case "SHIPPED":
       return ["bg-indigo-100 text-indigo-700", Split];
     case "DELIVERED":
       return ["bg-green-100 text-green-700", Package];
@@ -39,6 +37,8 @@ const getStatusStyle = (status) => {
       return ["bg-blue-100 text-blue-700", CircleCheckBig];
     case "PENDING":
       return ["bg-yellow-100 text-yellow-700", CircleCheckBig];
+    case "CANCELLED":
+      return ["bg-red-100 text-red-700", null];
     default:
       return ["bg-gray-100 text-gray-700", null];
   }
@@ -50,8 +50,10 @@ const OrdersManagement = () => {
   const [modalType, setModalType] = useState(null); // 'details' | 'refund'
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [status, setStatus] = useState("");
   const itemsPerPage = 10;
   const searchEnabled = !!debouncedTerm;
+  const filterEnabled = !searchEnabled && !!status;
   const { data: listData, isFetching: isFetchingList } = useListOrdersQuery(
     { page: currentPage, page_size: itemsPerPage },
     { skip: searchEnabled }
@@ -60,8 +62,16 @@ const OrdersManagement = () => {
     { page: currentPage, page_size: itemsPerPage, q: debouncedTerm },
     { skip: !searchEnabled }
   );
-  const data = searchEnabled ? searchData : listData;
-  const isFetching = searchEnabled ? isFetchingSearch : isFetchingList;
+  const { data: filterData, isFetching: isFetchingFilter } = useFilterOrdersQuery(
+    { page: currentPage, page_size: itemsPerPage, status },
+    { skip: !filterEnabled }
+  );
+  const data = searchEnabled ? searchData : filterEnabled ? filterData : listData;
+  const isFetching = searchEnabled
+    ? isFetchingSearch
+    : filterEnabled
+    ? isFetchingFilter
+    : isFetchingList;
   const totalPages = data?.total_pages ?? 0;
   const orders = (data?.results ?? []).map((o) => ({
     id: o.order_id,
@@ -79,6 +89,9 @@ const OrdersManagement = () => {
       price: i.subtotal,
     })),
     refundRequested: Boolean(o.is_applyed_for_refund),
+    refundId: o.refund_id ?? o.refund_request_id ?? o.refund?.id ?? null,
+    refundMessage: o.refund_message ?? o.refund?.message ?? "",
+    refundAttachments: o.refund_attachments ?? o.refund?.attachments ?? [],
   }));
 
   const filteredOrders = orders;
@@ -122,12 +135,19 @@ const OrdersManagement = () => {
             <CustomSelect
               placeholder="All Status"
               options={[
-                "All Status",
-                "Confirmed",
-                "Processed",
-                "Dispatched",
-                "Delivered",
+                { value: "", label: "All Status" },
+                { value: "PENDING", label: "Pending" },
+                { value: "PAID", label: "Paid" },
+                { value: "PROCESSING", label: "Processing" },
+                { value: "SHIPPED", label: "Shipped" },
+                { value: "DELIVERED", label: "Delivered" },
+                { value: "CANCELLED", label: "Cancelled" },
               ]}
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                setCurrentPage(1);
+              }}
               className="min-w-[180px]"
             />
           </div>
@@ -184,7 +204,7 @@ const OrdersManagement = () => {
                     className="hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-4 font-medium text-gray-900 flex flex-col">
-                      Order iD-{order.id}
+                      ORD-{order.id}
                       {order.refundRequested && (
                         <span className="text-red-500 hover:text-red-700 text-sm mt-1 font-normal">
                           ⚠️ Refund Requested
