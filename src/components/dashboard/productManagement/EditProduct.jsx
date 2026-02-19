@@ -1,9 +1,9 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { Trash2, Upload, X } from "lucide-react";
+import { useListColorsQuery } from "../../../redux/features/dashboard/color.api";
 
-/* ---------- FAKE SIZE & COLOR DATA ---------- */
+/* ---------- SIZE DATA ---------- */
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
-const COLOR_OPTIONS = ["Black", "White", "Blue", "Green", "Red", "Sky Blue"];
 
 /* ---------- COLOR HEX MAPPING ---------- */
 const COLOR_HEX_MAP = {
@@ -50,34 +50,34 @@ const CATEGORY_DATA = [
 /* ---------- SIMPLE COLOR NAME HELPER ---------- */
 const getColorNameFromHex = (hex) => {
   if (!hex || hex === "#" || hex === "") return "Select color";
-  
+
   // Make sure hex starts with #
   if (!hex.startsWith("#")) {
     hex = "#" + hex;
   }
-  
+
   // Convert 3-digit hex to 6-digit
   if (hex.length === 4) {
     hex = "#" + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
   }
-  
+
   // Normalize to uppercase for consistent matching
   hex = hex.toUpperCase();
-  
+
   // Check exact match first
   if (HEX_COLOR_MAP[hex]) {
     return HEX_COLOR_MAP[hex];
   }
-  
+
   // Try to find closest match from our COLOR_OPTIONS
   const hexValue = hex.replace("#", "");
   const r = parseInt(hexValue.substr(0, 2), 16);
   const g = parseInt(hexValue.substr(2, 2), 16);
   const b = parseInt(hexValue.substr(4, 2), 16);
-  
+
   // Simple color detection for basic colors
   if (isNaN(r) || isNaN(g) || isNaN(b)) return "Unknown";
-  
+
   // Check for black/white/gray
   if (r < 50 && g < 50 && b < 50) return "Black";
   if (r > 200 && g > 200 && b > 200) return "White";
@@ -86,7 +86,7 @@ const getColorNameFromHex = (hex) => {
     if (r > 150) return "White";
     return "Gray";
   }
-  
+
   // Check for primary colors
   if (r > 200 && g < 100 && b < 100) return "Red";
   if (g > 200 && r < 100 && b < 100) return "Green";
@@ -95,12 +95,14 @@ const getColorNameFromHex = (hex) => {
   if (r > 200 && b > 200 && g < 100) return "Pink";
   if (g > 150 && b > 150 && r < 100) return "Cyan";
   if (r > 150 && b > 150 && g < 100) return "Purple";
-  
+
   return "Unknown";
 };
 
 /* ---------- EDIT PRODUCT COMPONENT ---------- */
 const EditProduct = ({ product, onClose, onSave }) => {
+  const { data: apiColors = [] } = useListColorsQuery();
+
   /* ---------- STATE ---------- */
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedSubCategory, setSelectedSubCategory] = useState("");
@@ -153,7 +155,7 @@ const EditProduct = ({ product, onClose, onSave }) => {
       if (product.sizeStock && product.sizeStock.length > 0) {
         const sizes = [...new Set(product.sizeStock.map(item => item.size))];
         const colors = [...new Set(product.sizeStock.map(item => item.color || "#000000"))];
-        
+
         setSelectedSizes(sizes);
         setSelectedColors(colors);
         setStockRows(product.sizeStock.map(item => ({
@@ -229,7 +231,7 @@ const EditProduct = ({ product, onClose, onSave }) => {
 
   const handleColorSelect = (colorName) => {
     const hexColor = COLOR_HEX_MAP[colorName] || "#000000";
-    
+
     if (selectedColors.includes(colorName)) {
       setSelectedColors(prev => prev.filter(c => c !== colorName));
       // Remove rows with this color
@@ -254,13 +256,13 @@ const EditProduct = ({ product, onClose, onSave }) => {
   const removeStockRow = (index) => {
     const rowToRemove = stockRows[index];
     setStockRows(prev => prev.filter((_, i) => i !== index));
-    
+
     // Check if this was the last row with this size
     const hasSize = stockRows.some((row, i) => i !== index && row.size === rowToRemove.size);
     if (!hasSize) {
       setSelectedSizes(prev => prev.filter(size => size !== rowToRemove.size));
     }
-    
+
     // Check if this was the last row with this color
     const colorName = getColorNameFromHex(rowToRemove.color);
     const hasColor = stockRows.some((row, i) => i !== index && getColorNameFromHex(row.color) === colorName);
@@ -272,8 +274,8 @@ const EditProduct = ({ product, onClose, onSave }) => {
   /* ---------- UPDATE STOCK VALUE ---------- */
   const updateStockValue = (index, field, value) => {
     const numValue = parseInt(value) || 0;
-    setStockRows(prev => 
-      prev.map((row, i) => 
+    setStockRows(prev =>
+      prev.map((row, i) =>
         i === index ? { ...row, [field]: numValue } : row
       )
     );
@@ -281,12 +283,12 @@ const EditProduct = ({ product, onClose, onSave }) => {
 
   /* ---------- UPDATE COLOR VALUE ---------- */
   const updateColorValue = (index, newHexColor) => {
-    setStockRows(prev => 
-      prev.map((row, i) => 
+    setStockRows(prev =>
+      prev.map((row, i) =>
         i === index ? { ...row, color: newHexColor } : row
       )
     );
-    
+
     // Update selected colors if needed
     const colorName = getColorNameFromHex(newHexColor);
     if (colorName !== "Unknown" && colorName !== "Select color" && !selectedColors.includes(colorName)) {
@@ -306,7 +308,7 @@ const EditProduct = ({ product, onClose, onSave }) => {
   /* ---------- FORM SUBMISSION ---------- */
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     const updatedData = {
       ...formData,
       category: selectedCategory,
@@ -315,7 +317,7 @@ const EditProduct = ({ product, onClose, onSave }) => {
       newImages: images.map(img => img.file),
       sizeStock: stockRows,
     };
-    
+
     console.log("Updated Product Data:", updatedData);
     onSave?.(updatedData);
     onClose?.();
@@ -334,12 +336,13 @@ const EditProduct = ({ product, onClose, onSave }) => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block mb-1">Product Name</label>
-          <input 
-            className="input" 
+          <input
+            className="input"
             placeholder="Enter Product Name"
             name="productName"
             value={formData.productName}
             onChange={handleInputChange}
+            required
           />
         </div>
 
@@ -380,8 +383,8 @@ const EditProduct = ({ product, onClose, onSave }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block mb-1">Product Details</label>
-          <textarea 
-            className="textarea" 
+          <textarea
+            className="textarea"
             placeholder="Enter product description"
             name="productDetails"
             value={formData.productDetails}
@@ -390,8 +393,8 @@ const EditProduct = ({ product, onClose, onSave }) => {
         </div>
         <div>
           <label className="block mb-1">Care Instruction</label>
-          <textarea 
-            className="textarea" 
+          <textarea
+            className="textarea"
             placeholder="Enter product description"
             name="careInstruction"
             value={formData.careInstruction}
@@ -404,19 +407,20 @@ const EditProduct = ({ product, onClose, onSave }) => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className="block mb-1">Price ($)</label>
-          <input 
-            className="input number-input" 
+          <input
+            className="input number-input"
             placeholder="Enter Price"
             type="number"
             name="price"
             value={formData.price}
             onChange={handleInputChange}
+            required
           />
         </div>
         <div>
           <label className="block mb-1">Discount</label>
-          <input 
-            className="input number-input" 
+          <input
+            className="input number-input"
             placeholder="0%"
             type="number"
             name="discount"
@@ -426,8 +430,8 @@ const EditProduct = ({ product, onClose, onSave }) => {
         </div>
         <div>
           <label className="block mb-1">From</label>
-          <input 
-            className="input" 
+          <input
+            className="input"
             type="date"
             name="discountFrom"
             value={formData.discountFrom}
@@ -436,8 +440,8 @@ const EditProduct = ({ product, onClose, onSave }) => {
         </div>
         <div>
           <label className="block mb-1">To</label>
-          <input 
-            className="input" 
+          <input
+            className="input"
             type="date"
             name="discountTo"
             value={formData.discountTo}
@@ -450,8 +454,8 @@ const EditProduct = ({ product, onClose, onSave }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block mb-1">Stock Quantity</label>
-          <input 
-            className="input number-input" 
+          <input
+            className="input number-input"
             placeholder="Enter Quantity"
             type="number"
             name="stockQuantity"
@@ -461,8 +465,8 @@ const EditProduct = ({ product, onClose, onSave }) => {
         </div>
         <div>
           <label className="block mb-1">Tag</label>
-          <input 
-            className="input" 
+          <input
+            className="input"
             placeholder="enter tag"
             name="tag"
             value={formData.tag}
@@ -540,10 +544,9 @@ const EditProduct = ({ product, onClose, onSave }) => {
                   type="button"
                   onClick={() => handleSizeSelect(size)}
                   className={`px-4 py-1.5 rounded-md border text-sm transition
-                    ${
-                      active
-                        ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
-                        : "bg-white text-gray-700 border-gray-300"
+                    ${active
+                      ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
+                      : "bg-white text-gray-700 border-gray-300"
                     }`}
                 >
                   {size}
@@ -557,24 +560,33 @@ const EditProduct = ({ product, onClose, onSave }) => {
         <div>
           <label className="block mb-2">Color Select</label>
           <div className="flex flex-wrap gap-2 bg-white p-3 rounded-lg border">
-            {COLOR_OPTIONS.map((color) => {
-              const active = selectedColors.includes(color);
-              return (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => handleColorSelect(color)}
-                  className={`px-4 py-1.5 rounded-md border text-sm transition
-                    ${
-                      active
+            {apiColors.length === 0 ? (
+              <span className="text-sm text-gray-400 italic">No colors available. Add colors first.</span>
+            ) : (
+              apiColors.map((color) => {
+                const colorName = color.name;
+                const colorHex = color.hex || color.color_code || "#cccccc";
+                const active = selectedColors.includes(colorName);
+                return (
+                  <button
+                    key={color.id ?? color.color_id}
+                    type="button"
+                    onClick={() => handleColorSelect(colorName)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm transition
+                      ${active
                         ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
                         : "bg-white text-gray-700 border-gray-300"
-                    }`}
-                >
-                  {color}
-                </button>
-              );
-            })}
+                      }`}
+                  >
+                    <span
+                      className="w-4 h-4 rounded-full border border-black/10 flex-shrink-0"
+                      style={{ backgroundColor: colorHex }}
+                    />
+                    {colorName}
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
@@ -617,8 +629,8 @@ const EditProduct = ({ product, onClose, onSave }) => {
                     </div>
                   </td>
                   <td className="px-3 py-2">
-                    <input 
-                      className="table-input number-input" 
+                    <input
+                      className="table-input number-input"
                       type="number"
                       min="0"
                       value={row.initial}
@@ -626,8 +638,8 @@ const EditProduct = ({ product, onClose, onSave }) => {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <input 
-                      className="table-input number-input" 
+                    <input
+                      className="table-input number-input"
                       type="number"
                       min="0"
                       value={row.current}
@@ -635,8 +647,8 @@ const EditProduct = ({ product, onClose, onSave }) => {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <input 
-                      className="table-input number-input" 
+                    <input
+                      className="table-input number-input"
                       type="number"
                       min="0"
                       value={row.sold}
@@ -661,13 +673,13 @@ const EditProduct = ({ product, onClose, onSave }) => {
 
       {/* -------- Actions -------- */}
       <div className="flex gap-4">
-        <button 
+        <button
           className="flex-1 bg-[#6E0B0B] text-white py-3 rounded-lg font-medium hover:bg-[#5a0909] transition-colors"
           onClick={handleSubmit}
         >
           Update Product
         </button>
-        <button 
+        <button
           className="border border-gray-300 p-3 rounded-lg hover:bg-gray-50 transition-colors"
           onClick={handleCancel}
         >

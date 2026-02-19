@@ -37,15 +37,6 @@ export const customerApi = baseApi.injectEndpoints({
       invalidatesTags: ["Customers", "CustomerProfile"],
     }),
 
-    activateUser: builder.mutation({
-      query: (userId) => ({
-        url: `/dashboard/customer-management/users/${userId}/activate/`,
-        method: "PATCH",
-        body: {},
-      }),
-      invalidatesTags: ["Customers", "CustomerProfile"],
-    }),
-
     deleteUser: builder.mutation({
       query: (userId) => ({
         url: `/dashboard/customer-management/users/${userId}/delete/`,
@@ -61,6 +52,5 @@ export const {
   useSearchCustomersQuery,
   useGetCustomerProfileQuery,
   useSuspendUserMutation,
-  useActivateUserMutation,
   useDeleteUserMutation,
 } = customerApi;

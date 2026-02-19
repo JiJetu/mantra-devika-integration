@@ -4,7 +4,6 @@ import {
   useGetCustomerProfileQuery,
   useSuspendUserMutation,
   useDeleteUserMutation,
-  useActivateUserMutation,
 } from "../../../redux/features/dashboard/customer.api";
 import { formatDate } from "../../../lib/format/date";
 
@@ -65,7 +64,6 @@ const CustomerProfile = ({ userId, onClose }) => {
   });
   const [suspendUser, { isLoading: isSuspending }] = useSuspendUserMutation();
   const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
-  const [activateUser, { isLoading: isActivating }] = useActivateUserMutation();
   const name = data?.user_name || (data?.email || "").split("@")[0] || "";
   const id = data?.user_id;
   const email = data?.email || "";
@@ -122,7 +120,7 @@ const CustomerProfile = ({ userId, onClose }) => {
   const handleActivate = () => {
     if (!userId) return;
     confirmAction("Activate", async () => {
-      await activateUser(userId).unwrap();
+      await suspendUser(userId).unwrap();
       message.success("User activated successfully");
     });
   };
@@ -326,7 +324,7 @@ const CustomerProfile = ({ userId, onClose }) => {
           <>
             <button
               onClick={handleActivate}
-              disabled={isActivating}
+              disabled={isSuspending}
               className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
             >
               <Check size={20} />

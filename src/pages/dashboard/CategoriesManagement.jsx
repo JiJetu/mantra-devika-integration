@@ -61,13 +61,13 @@ const CategoriesManagement = () => {
             </p>
           </div>
           <div className="flex justify-center items-center gap-5">
-            <button
+            {/* <button
               onClick={() => openModal("subcategory")}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-[#5B0D0D] text-white rounded-lg hover:bg-[#4a0b0b] transition-colors font-medium shadow-sm"
             >
               <Plus size={18} />
               Add SubCategory
-            </button>
+            </button> */}
             <button
               onClick={() => openModal("add")}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-[#5B0D0D] text-white rounded-lg hover:bg-[#4a0b0b] transition-colors font-medium shadow-sm"

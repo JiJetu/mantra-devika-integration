@@ -1,38 +1,23 @@
-import React, { useState, useRef, useMemo } from "react";
-import { Trash2, Upload, X } from "lucide-react";
+import { useState, useRef } from "react";
+import { Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { useCreateProductMutation } from "../../../redux/features/dashboard/product.api";
+import { useListCategoriesQuery } from "../../../redux/features/dashboard/category";
+import { useListColorsQuery } from "../../../redux/features/dashboard/color.api";
 
-/* ---------- FAKE SIZE & COLOR DATA (NEW) ---------- */
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
-const COLOR_OPTIONS = ["Black", "White", "Blue", "Green", "Red", "Sky Blue"];
 
-/* ---------- CATEGORY DATA (UNCHANGED) ---------- */
-const CATEGORY_DATA = [
-  {
-    id: 1,
-    name: "Men",
-    subCategories: ["T-Shirt", "Shirt", "Pants", "Jacket"],
-  },
-  { id: 2, name: "Women", subCategories: ["Dress", "Top", "Skirt", "Jeans"] },
-  {
-    id: 3,
-    name: "Kids",
-    subCategories: ["Baby Wear", "School Wear", "Winter Wear"],
-  },
-  {
-    id: 4,
-    name: "Accessories",
-    subCategories: ["Belt", "Cap", "Wallet", "Sunglasses"],
-  },
-];
 
 const AddProduct = () => {
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [selectedSubCategory, setSelectedSubCategory] = useState("");
+  const [createProduct, { isLoading }] = useCreateProductMutation();
+  const { data: categories = [] } = useListCategoriesQuery();
+  const { data: apiColors = [] } = useListColorsQuery();
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
 
   /* ---------- IMAGE STATE (UNCHANGED) ---------- */
   const [images, setImages] = useState([]);
   const fileInputRef = useRef(null);
+  const [imageError, setImageError] = useState(false);
 
   /* ---------- SIZE & COLOR STATE (NEW) ---------- */
   const [selectedSizes, setSelectedSizes] = useState([]);
@@ -52,9 +37,10 @@ const AddProduct = () => {
     tag: "",
   });
 
-  const currentCategory = CATEGORY_DATA.find(
-    (cat) => cat.name === selectedCategory,
-  );
+  const handleCategoryChange = (e) => {
+    const v = e.target.value;
+    setSelectedCategoryId(v);
+  };
 
   /* ---------- IMAGE LOGIC (UNCHANGED) ---------- */
   const handleImageUpload = (e) => {
@@ -64,6 +50,7 @@ const AddProduct = () => {
       preview: URL.createObjectURL(file),
     }));
     setImages((prev) => [...prev, ...newImages]);
+    setImageError(false);
     e.target.value = "";
   };
 
@@ -156,11 +143,66 @@ const AddProduct = () => {
   };
 
   /* ---------- HANDLE FORM SUBMIT ---------- */
-  const handleSubmit = () => {
-    console.log("Form Data:", formData);
-    console.log("Images:", images);
-    console.log("Stock Rows:", stockRows);
-    toast.success("Product added successfully!");
+  const handleSubmit = async () => {
+    if (images.length === 0) {
+      setImageError(true);
+      toast.error("Please upload at least one product photo.");
+      return;
+    }
+    try {
+      const fd = new FormData();
+      fd.append("name", formData.productName || "");
+      fd.append("description", formData.productDetails || "");
+      fd.append("price", String(formData.price || 0));
+      fd.append("actual_price", String(formData.price || 0));
+      fd.append("discount", String(formData.discount || 0));
+      fd.append("care_instructions", formData.careInstruction || "");
+      const colors = selectedColors.map((name) => {
+        const found = apiColors.find((c) => c.name === name);
+        return { name, hex_code: found?.hex_code || found?.color_code || "" };
+      });
+      const variants = stockRows.map((row) => ({
+        size: row.size,
+        in_stock: Number(row.current) > 0,
+        stock_quantity: Number(row.current) || 0,
+        color_name: row.color,
+      }));
+      const tags =
+        (formData.tag || "").trim().length > 0
+          ? [{ name: formData.tag.trim() }]
+          : [];
+      if (selectedCategoryId) {
+        fd.append("category_ids", JSON.stringify([Number(selectedCategoryId)]));
+      }
+      fd.append("colors", JSON.stringify(colors));
+      fd.append("variants", JSON.stringify(variants));
+      fd.append("tags", JSON.stringify(tags));
+      images.forEach((img) => {
+        if (img?.file) fd.append("photos", img.file);
+      });
+      fd.append("is_main_index", "0");
+      await createProduct(fd).unwrap();
+      toast.success("Product added successfully!");
+      setFormData({
+        productName: "",
+        productDetails: "",
+        careInstruction: "",
+        price: "",
+        discount: "",
+        discountFrom: "",
+        discountTo: "",
+        stockQuantity: "",
+        tag: "",
+      });
+      setSelectedCategoryId("");
+      setImages([]);
+      setImageError(false);
+      setSelectedSizes([]);
+      setSelectedColors([]);
+      setStockRows([]);
+    } catch (e) {
+      toast.error("Failed to add product");
+    }
   };
 
   /* ---------- HANDLE CANCEL ---------- */
@@ -176,8 +218,7 @@ const AddProduct = () => {
       stockQuantity: "",
       tag: "",
     });
-    setSelectedCategory("");
-    setSelectedSubCategory("");
+    setSelectedCategoryId("");
     setImages([]);
     setSelectedSizes([]);
     setSelectedColors([]);
@@ -187,7 +228,7 @@ const AddProduct = () => {
   return (
     <div className="bg-white p-6 rounded-xl space-y-6 text-sm lora">
       {/* -------- Top Inputs -------- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block mb-1">Product Name</label>
           <input
@@ -196,42 +237,26 @@ const AddProduct = () => {
             name="productName"
             value={formData.productName}
             onChange={handleInputChange}
+            required
           />
         </div>
 
         <div>
-          <label className="block mb-1">Category</label>
+          <label className="block mb-1">Categories</label>
           <select
             className="input"
-            value={selectedCategory}
-            onChange={(e) => {
-              setSelectedCategory(e.target.value);
-              setSelectedSubCategory("");
-            }}
+            value={selectedCategoryId}
+            onChange={handleCategoryChange}
           >
             <option value="">Select Category</option>
-            {CATEGORY_DATA.map((cat) => (
-              <option key={cat.id} value={cat.name}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block mb-1">Sub category</label>
-          <select
-            className="input"
-            value={selectedSubCategory}
-            onChange={(e) => setSelectedSubCategory(e.target.value)}
-            disabled={!selectedCategory}
-          >
-            <option value="">Select Sub-Category</option>
-            {currentCategory?.subCategories.map((sub, i) => (
-              <option key={i} value={sub}>
-                {sub}
-              </option>
-            ))}
+            {categories.map((cat, idx) => {
+              const id = cat.category_id ?? idx + 1;
+              return (
+                <option key={id} value={id}>
+                  {cat.name}
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>
@@ -271,6 +296,7 @@ const AddProduct = () => {
             name="price"
             value={formData.price}
             onChange={handleInputChange}
+            required
           />
         </div>
         <div>
@@ -333,15 +359,23 @@ const AddProduct = () => {
 
       {/* -------- Product Photo -------- */}
       <div>
-        <label className="block mb-2">Product Photo</label>
+        <label className="block mb-2">
+          Product Photo <span className="text-red-500">*</span>
+        </label>
 
         <div
           onClick={() => fileInputRef.current.click()}
-          className="bg-[#F3EAEA] border border-dashed border-[#6E0B0B] rounded-lg py-4 text-center cursor-pointer"
+          className={`border border-dashed rounded-lg py-4 text-center cursor-pointer transition-colors ${imageError
+            ? "bg-red-50 border-red-500"
+            : "bg-[#F3EAEA] border-[#6E0B0B]"
+            }`}
         >
           <p className="text-[#6E0B0B] font-medium">
             Add file <span className="text-gray-500">or drop files here</span>
           </p>
+          {imageError && (
+            <p className="text-red-500 text-xs mt-1">At least one photo is required</p>
+          )}
         </div>
 
         <input
@@ -386,10 +420,9 @@ const AddProduct = () => {
                   type="button"
                   onClick={() => handleSizeSelect(size)}
                   className={`px-4 py-1.5 rounded-md border text-sm transition
-                    ${
-                      active
-                        ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
-                        : "bg-white text-gray-700 border-gray-300"
+                    ${active
+                      ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
+                      : "bg-white text-gray-700 border-gray-300"
                     }`}
                 >
                   {size}
@@ -403,24 +436,33 @@ const AddProduct = () => {
         <div>
           <label className="block mb-2">Color Select</label>
           <div className="flex flex-wrap gap-2 bg-white p-3 rounded-lg border">
-            {COLOR_OPTIONS.map((color) => {
-              const active = selectedColors.includes(color);
-              return (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => handleColorSelect(color)}
-                  className={`px-4 py-1.5 rounded-md border text-sm transition
-                    ${
-                      active
+            {apiColors.length === 0 ? (
+              <span className="text-sm text-gray-400 italic">No colors available. Add colors first.</span>
+            ) : (
+              apiColors.map((color) => {
+                const colorName = color.name;
+                const colorHex = color.hex_code || color.color_code || "#cccccc";
+                const active = selectedColors.includes(colorName);
+                return (
+                  <button
+                    key={color.id ?? color.color_id}
+                    type="button"
+                    onClick={() => handleColorSelect(colorName)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm transition
+                      ${active
                         ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
                         : "bg-white text-gray-700 border-gray-300"
-                    }`}
-                >
-                  {color}
-                </button>
-              );
-            })}
+                      }`}
+                  >
+                    <span
+                      className="w-4 h-4 rounded-full border border-black/10 flex-shrink-0"
+                      style={{ backgroundColor: colorHex }}
+                    />
+                    {colorName}
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
@@ -501,6 +543,7 @@ const AddProduct = () => {
         <button
           className="flex-1 bg-[#6E0B0B] text-white py-3 rounded-lg font-medium hover:bg-[#5a0909] transition-colors"
           onClick={handleSubmit}
+          disabled={isLoading}
         >
           Add Product
         </button>

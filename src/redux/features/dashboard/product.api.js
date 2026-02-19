@@ -26,6 +26,14 @@ export const productApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["Products", "ProductStats"],
     }),
+    createProduct: builder.mutation({
+      query: (body) => ({
+        url: "/dashboard/product-management/products/create/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Products", "ProductStats"],
+    }),
   }),
 });
 
@@ -33,4 +41,5 @@ export const {
   useGetProductStatsQuery,
   useListProductsQuery,
   useDeleteProductMutation,
+  useCreateProductMutation,
 } = productApi;

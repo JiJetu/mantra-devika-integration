@@ -32,9 +32,11 @@ const CustomSelect = ({
           `}
           {...rest}
         >
-          <option value="" disabled>
-            {placeholder}
-          </option>
+          {!rest.multiple && (
+            <option value="" disabled>
+              {placeholder}
+            </option>
+          )}
 
           {options.map((opt) => {
             const value = typeof opt === "object" ? opt.value : opt;
