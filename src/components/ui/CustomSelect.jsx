@@ -6,6 +6,7 @@ const CustomSelect = ({
   register,
   error,
   className = "",
+  selectClassName = "",
   disabled = false,
   ...rest
 }) => {
@@ -29,9 +30,13 @@ const CustomSelect = ({
             disabled:opacity-60 disabled:cursor-not-allowed
             appearance-none
             ${error ? "border-red-500 focus:border-red-500 focus:ring-red-500/30" : ""}
+            ${selectClassName}
           `}
           {...rest}
         >
+          {/* <option value="" disabled>
+            {placeholder}
+          </option> */}
           {!rest.multiple && (
             <option value="" disabled>
               {placeholder}

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { DollarSign, Users, Eye, ShoppingBag } from "lucide-react";
 import StatCard from "../../components/dashboard/home/StatCard";
 import DashboardChart from "../../components/dashboard/home/DashboardChart";
@@ -20,6 +21,11 @@ const COLORS = [
 ];
 
 const Dashboard = () => {
+  const RANGE_OPTIONS = ["Last 7 Days", "Last 30 Days", "This Month", "This Year"];
+  const [salesRange, setSalesRange] = useState("Last 7 Days");
+  const [pagesRange, setPagesRange] = useState("Last 7 Days");
+  const [orderRange, setOrderRange] = useState("Last 7 Days");
+  const [engagementRange, setEngagementRange] = useState("Last 7 Days");
   const { data: stats } = useGetDashboardStatsQuery();
   const { data: trends } = useGetSalesTrendsQuery();
   const { data: orderStatusRaw } = useGetOrderStatusQuery();
@@ -56,29 +62,63 @@ const Dashboard = () => {
     visitorsChange: 0,
   };
 
-  const salesTrend = pickList(trends?.last_7_days ?? trends).map((d) => ({
-    day: d?.date ?? "",
+  const salesRangeKey =
+    salesRange === "Last 7 Days"
+      ? "last_7_days"
+      : salesRange === "Last 30 Days"
+      ? "last_30_days"
+      : salesRange === "This Month"
+      ? "this_month"
+      : "this_year";
+  const salesList = Array.isArray(trends?.[salesRangeKey]) ? trends[salesRangeKey] : [];
+  const salesTrend = salesList.map((d) => ({
+    day: d?.date ?? d?.month ?? "",
     value: d?.total_sales ?? 0,
   }));
 
-  const orderStatus = (orderStatusRaw?.last_7_days?.breakdown ?? []).map(
-    (b) => ({
-      name: b?.status ?? "",
-      value: b?.count ?? 0,
-    })
-  );
+  const orderRangeKey =
+    orderRange === "Last 7 Days"
+      ? "last_7_days"
+      : orderRange === "Last 30 Days"
+      ? "last_30_days"
+      : orderRange === "This Month"
+      ? "this_month"
+      : "this_year";
+  const orderStatusList = Array.isArray(orderStatusRaw?.[orderRangeKey]?.breakdown)
+    ? orderStatusRaw[orderRangeKey].breakdown
+    : [];
+  const orderStatus = orderStatusList.map((b) => ({
+    name: b?.status ?? "",
+    value: b?.count ?? 0,
+  }));
 
-  const mostVisitedPages = pickList(
-    mostVisitedRaw?.last_7_days ?? mostVisitedRaw
-  ).map((item) => ({
+  const pagesRangeKey =
+    pagesRange === "Last 7 Days"
+      ? "last_7_days"
+      : pagesRange === "Last 30 Days"
+      ? "last_30_days"
+      : pagesRange === "This Month"
+      ? "this_month"
+      : "this_year";
+  const pagesList = Array.isArray(mostVisitedRaw?.[pagesRangeKey]) ? mostVisitedRaw[pagesRangeKey] : [];
+  const mostVisitedPages = pagesList.map((item) => ({
     rank: item?.rank ?? 0,
     page: item?.page ?? item?.path ?? "Unknown",
     visits: item?.visit_count ?? item?.visits ?? item?.count ?? 0,
   }));
 
-  const productEngagement = pickList(
-    engagementRaw?.last_7_days ?? engagementRaw
-  ).map((item) => ({
+  const engagementRangeKey =
+    engagementRange === "Last 7 Days"
+      ? "last_7_days"
+      : engagementRange === "Last 30 Days"
+      ? "last_30_days"
+      : engagementRange === "This Month"
+      ? "this_month"
+      : "this_year";
+  const engagementList = Array.isArray(engagementRaw?.[engagementRangeKey])
+    ? engagementRaw[engagementRangeKey]
+    : [];
+  const productEngagement = engagementList.map((item) => ({
     product: item?.product_name ?? item?.product ?? item?.name ?? "Unknown",
     views: item?.views ?? 0,
     clicks: item?.clicks ?? 0,
@@ -141,7 +181,16 @@ const Dashboard = () => {
       </div>
 
       {/* Charts */}
-      <DashboardChart COLORS={COLORS} salesTrend={salesTrend} orderStatus={orderStatus} />
+      <DashboardChart
+        COLORS={COLORS}
+        salesTrend={salesTrend}
+        orderStatus={orderStatus}
+        salesRange={salesRange}
+        rangeOptions={RANGE_OPTIONS}
+        onChangeSalesRange={(e) => setSalesRange(e.target.value)}
+        orderRange={orderRange}
+        onChangeOrderRange={(e) => setOrderRange(e.target.value)}
+      />
 
       {/* Bottom section - Most Visited + Product Engagement */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
@@ -153,9 +202,11 @@ const Dashboard = () => {
             </h3>
 
             <CustomSelect
-              options={["Last 7 Days", "Last 30 Days", "This Month", "This Year"]}
+              options={RANGE_OPTIONS}
               placeholder="Last 7 Days"
               className="w-full sm:w-44"
+              value={pagesRange}
+              onChange={(e) => setPagesRange(e.target.value)}
             />
           </div>
 
@@ -193,9 +244,11 @@ const Dashboard = () => {
 
             {/* ← Fixed with CustomSelect */}
             <CustomSelect
-              options={["Last 7 Days", "Last 30 Days", "This Month", "This Year"]}
+              options={RANGE_OPTIONS}
               placeholder="Last 7 Days"
               className="w-full sm:w-44"
+              value={engagementRange}
+              onChange={(e) => setEngagementRange(e.target.value)}
             />
           </div>
 

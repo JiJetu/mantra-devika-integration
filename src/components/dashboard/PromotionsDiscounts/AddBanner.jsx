@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { X } from "lucide-react";
+import { message } from "antd";
+import { useCreateBannerMutation } from "../../../redux/features/dashboard/promotion";
 
-const AddBanner = () => {
+const AddBanner = ({ onClose }) => {
   const { register, handleSubmit, reset } = useForm();
 
   // Image previews
@@ -41,32 +43,28 @@ const AddBanner = () => {
     setVideoFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const onSubmit = (data) => {
-    const formData = new FormData();
+  const [createBanner, { isLoading }] = useCreateBannerMutation();
 
-    formData.append("title", data.title);
-    formData.append("description", data.description);
-    formData.append("startDate", data.startDate);
-    formData.append("endDate", data.endDate);
-
-    imageFiles.forEach((file) => {
-      formData.append("images", file);
-    });
-
-    videoFiles.forEach((file) => {
-      formData.append("videos", file);
-    });
-
-    console.log("Submitting banner FormData:");
-    for (let [key, value] of formData.entries()) {
-      console.log(`${key}:`, value);
+  const onSubmit = async (data) => {
+    try {
+      const formData = new FormData();
+      formData.append("title", data.title);
+      formData.append("description", data.description);
+      formData.append("start_date", data.startDate || "");
+      formData.append("end_date", data.endDate || "");
+      if (imageFiles[0]) formData.append("image", imageFiles[0]);
+      if (videoFiles[0]) formData.append("video", videoFiles[0]);
+      await createBanner(formData).unwrap();
+      message.success("Banner created");
+      reset();
+      setImagePreviews([]);
+      setImageFiles([]);
+      setVideoPreviews([]);
+      setVideoFiles([]);
+      onClose?.();
+    } catch {
+      message.error("Failed to create banner");
     }
-
-    reset();
-    setImagePreviews([]);
-    setImageFiles([]);
-    setVideoPreviews([]);
-    setVideoFiles([]);
   };
 
   return (
@@ -186,12 +184,14 @@ const AddBanner = () => {
       <div className="flex flex-col md:flex-row gap-4 pt-6">
         <button
           type="submit"
-          className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base"
+          disabled={isLoading}
+          className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base disabled:opacity-60"
         >
-          Save
+          {isLoading ? "Saving..." : "Save"}
         </button>
         <button
           type="button"
+          onClick={onClose}
           className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium text-base"
         >
           Cancel

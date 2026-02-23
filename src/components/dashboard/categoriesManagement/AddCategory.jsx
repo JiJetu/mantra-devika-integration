@@ -1,13 +1,18 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { X } from "lucide-react";
+import { X, PlusCircle } from "lucide-react";
 import { useCreateCategoryMutation } from "../../../redux/features/dashboard/category";
 import { message } from "antd";
+import CustomSelect from "../../ui/CustomSelect";
 
 const AddCategory = ({ onClose }) => {
   const { register, handleSubmit, reset } = useForm();
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [wearType, setWearType] = useState("");
+  const [sizeTitle, setSizeTitle] = useState("");
+  const [sizeValue, setSizeValue] = useState("");
+  const [sizeGuide, setSizeGuide] = useState([]);
   const [createCategory, { isLoading: isCreating }] = useCreateCategoryMutation();
 
   const handleImageChange = (e) => {
@@ -23,11 +28,24 @@ const AddCategory = ({ onClose }) => {
     setSelectedFile(null);
   };
 
+  const addSizePair = () => {
+    if (!sizeTitle || !sizeValue) return;
+    setSizeGuide((prev) => [...prev, { title: sizeTitle, value: sizeValue }]);
+    setSizeTitle("");
+    setSizeValue("");
+  };
+
+  const removeSizePair = (idx) => {
+    setSizeGuide((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const onSubmit = async (data) => {
     const formData = new FormData();
     formData.append("name", data.name);
     formData.append("description", data.description);
     formData.append("is_active", data.is_active ? "true" : "false");
+    if (wearType) formData.append("wear_type", wearType);
+    if (sizeGuide.length > 0) formData.append("size_guide", JSON.stringify(sizeGuide));
     if (selectedFile) {
       formData.append("photo", selectedFile);
     }
@@ -37,6 +55,8 @@ const AddCategory = ({ onClose }) => {
       reset();
       setPreviewImage(null);
       setSelectedFile(null);
+      setWearType("");
+      setSizeGuide([]);
       onClose?.();
     } catch {
       message.error("Failed to create category");
@@ -109,6 +129,79 @@ const AddCategory = ({ onClose }) => {
             >
               <X size={14} />
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* Wear type */}
+      <div>
+        <label className="block text-sm md:text-base text-gray-700 mb-1 md:mb-2">
+          Wear type
+        </label>
+        <CustomSelect
+          options={[
+            { label: "Upper Body wear", value: "upper_body" },
+            { label: "Lower Body wear", value: "lower_body" },
+            { label: "Footwear", value: "footwear" },
+            { label: "Accessories", value: "accessories" },
+          ]}
+          placeholder="Select wear type"
+          value={wearType}
+          onChange={(e) => setWearType(e.target.value)}
+          selectClassName="bg-[#F3E9E7]"
+        />
+      </div>
+
+      {/* Update your sizeguide */}
+      <div>
+        <label className="block text-sm md:text-base text-gray-700 mb-2">
+          Update your sizeguide
+        </label>
+        <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_auto] gap-3">
+          <CustomSelect
+            options={["XS", "S", "M", "L", "XL", "XXL", "3XL"].map((s) => ({
+              label: s,
+              value: s,
+            }))}
+            placeholder="Size Title"
+            value={sizeTitle}
+            onChange={(e) => setSizeTitle(e.target.value)}
+            selectClassName="bg-[#F3E9E7]"
+          />
+          <input
+            value={sizeValue}
+            onChange={(e) => setSizeValue(e.target.value)}
+            placeholder="Size value"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <button
+            type="button"
+            onClick={addSizePair}
+            // className="flex items-center justify-center p-2 rounded-full border border-gray-300 hover:bg-gray-50"
+            aria-label="Add size"
+          >
+            <PlusCircle size={24} />
+          </button>
+        </div>
+
+        {sizeGuide.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {sizeGuide.map((sg, idx) => (
+              <span
+                key={`${sg.title}-${idx}`}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#FFF8E6] text-sm border border-[#F9EFD5]"
+              >
+                {sg.title}: {sg.value}
+                <button
+                  type="button"
+                  onClick={() => removeSizePair(idx)}
+                  className="ml-1 text-gray-500 hover:text-gray-700"
+                  aria-label="Remove size"
+                >
+                  <X size={14} />
+                </button>
+              </span>
+            ))}
           </div>
         )}
       </div>

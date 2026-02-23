@@ -12,7 +12,16 @@ import {
 } from "recharts";
 import CustomSelect from "../../ui/CustomSelect";
 
-const DashboardChart = ({ salesTrend, orderStatus, COLORS }) => {
+const DashboardChart = ({
+  salesTrend,
+  orderStatus,
+  COLORS,
+  salesRange,
+  rangeOptions = ["Last 7 Days", "Last 30 Days", "This Month", "This Year"],
+  onChangeSalesRange,
+  orderRange,
+  onChangeOrderRange,
+}) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 lora">
       {/* Sales Trend */}
@@ -22,9 +31,11 @@ const DashboardChart = ({ salesTrend, orderStatus, COLORS }) => {
 
           {/* Fixed with CustomSelect */}
           <CustomSelect
-            options={["Last 7 Days", "Last 30 Days", "This Month", "This Year"]}
+            options={rangeOptions}
             placeholder="Last 7 Days"
             className="w-full sm:w-44"
+            value={salesRange}
+            onChange={onChangeSalesRange}
           />
         </div>
 
@@ -84,9 +95,11 @@ const DashboardChart = ({ salesTrend, orderStatus, COLORS }) => {
 
 
           <CustomSelect
-            options={["Last 7 Days", "Last 30 Days", "This Month", "This Year"]}
+            options={rangeOptions}
             placeholder="Last 7 Days"
             className="w-full sm:w-44"
+            value={orderRange}
+            onChange={onChangeOrderRange}
           />
         </div>
 

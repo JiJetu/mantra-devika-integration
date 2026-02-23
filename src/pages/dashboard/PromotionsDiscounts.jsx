@@ -11,24 +11,10 @@ import EditPromoCode from "../../components/dashboard/PromotionsDiscounts/EditPr
 import AddPopup from "../../components/dashboard/PromotionsDiscounts/AddPopup";
 import { IMAGES } from "../../assets";
 import EditPopup from "../../components/dashboard/PromotionsDiscounts/EditPopup";
+import { useListBannersQuery, useDeleteBannerMutation } from "../../redux/features/dashboard/promotion";
+import { message } from "antd";
 
-// Fake data for each section
-const fakeBanners = [
-  {
-    id: 1,
-    title: "Summer Sale 2024",
-    description: "Link: /sale",
-    status: "active",
-    image: IMAGES.product,
-  },
-  {
-    id: 2,
-    title: "New Arrivals",
-    description: "Link: /new",
-    status: "active",
-    image: IMAGES.product,
-  },
-];
+// Fake data for sections other than banners
 
 const fakeHeadingAnnouncements = [
   {
@@ -70,6 +56,8 @@ const PromotionsDiscounts = () => {
   const [activeTab, setActiveTab] = useState("websiteBanners");
   const [modalType, setModalType] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
+  const { data: bannersData, isFetching: loadingBanners } = useListBannersQuery();
+  const [deleteBanner, { isLoading: deleting }] = useDeleteBannerMutation();
 
   const openModal = (type, item = null) => {
     setModalType(type);
@@ -81,10 +69,20 @@ const PromotionsDiscounts = () => {
     setSelectedItem(null);
   };
 
+  const mapBanners = (list) =>
+    (Array.isArray(list) ? list : []).map((b, idx) => ({
+      id: b.banner_id ?? b.id ?? idx + 1,
+      title: b.title ?? "",
+      description: b.description ?? "",
+      status: b.is_active ? "active" : "inactive",
+      image: b.image ?? b.image_url ?? IMAGES.product,
+      video: b.video ?? b.video_url ?? null,
+    }));
+
   const getTabData = () => {
     switch (activeTab) {
       case "websiteBanners":
-        return fakeBanners;
+        return mapBanners(bannersData);
       case "headingAnnouncement":
         return fakeHeadingAnnouncements;
       case "promoCode":
@@ -142,6 +140,17 @@ const PromotionsDiscounts = () => {
   };
 
   const headers = getHeaders();
+
+  const handleDelete = async (item) => {
+    if (activeTab !== "websiteBanners") return;
+    try {
+      const id = item.id;
+      await deleteBanner(id).unwrap();
+      message.success("Banner deleted");
+    } catch {
+      message.error("Failed to delete banner");
+    }
+  };
 
   return (
     <>
@@ -213,7 +222,9 @@ const PromotionsDiscounts = () => {
         {/* Conditional Render: List for websiteBanners, Table for others */}
         {activeTab === "websiteBanners" || activeTab === "popUps" ? (
           <div className="space-y-2 md:space-y-3 lg:space-y-4">
-            {tabData.map((item) => (
+            {activeTab === "websiteBanners" && loadingBanners ? (
+              <div className="p-6 text-center text-gray-500">Loading...</div>
+            ) : tabData.map((item) => (
               <div
                 key={item.id}
                 className="flex items-center justify-between bg-white px-4 py-3 md:px-5 md:py-4 lg:px-6 lg:py-5 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow"
@@ -247,7 +258,11 @@ const PromotionsDiscounts = () => {
                   >
                     <SquarePen size={18} />
                   </button>
-                  <button className="text-red-600 hover:text-red-800 transition-colors">
+                  <button
+                    onClick={() => handleDelete(item)}
+                    disabled={deleting && activeTab === "websiteBanners"}
+                    className="text-red-600 hover:text-red-800 transition-colors disabled:opacity-60"
+                  >
                     <Trash2 size={18} />
                   </button>
                 </div>
@@ -319,7 +334,7 @@ const PromotionsDiscounts = () => {
         title="Add New Banner"
         className="max-w-md md:max-w-lg lg:max-w-xl"
       >
-        <AddBanner />
+        <AddBanner onClose={closeModal} />
       </Modal>
 
       <Modal
@@ -328,7 +343,7 @@ const PromotionsDiscounts = () => {
         title="Edit Banner"
         className="max-w-md md:max-w-lg lg:max-w-xl"
       >
-        <EditBanner item={selectedItem} />
+        <EditBanner item={selectedItem} onClose={closeModal} />
       </Modal>
 
       <Modal

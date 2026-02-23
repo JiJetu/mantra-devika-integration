@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { X } from "lucide-react";
+import { message } from "antd";
+import { useEditBannerMutation } from "../../../redux/features/dashboard/promotion";
 
 const EditBanner = ({ item, onClose }) => {
   const { register, handleSubmit, setValue } = useForm();
+  const [editBanner, { isLoading }] = useEditBannerMutation();
 
   // Image state
   const [imagePreview, setImagePreview] = useState(null);
@@ -62,36 +65,20 @@ const EditBanner = ({ item, onClose }) => {
     setRemoveVideo(true);
   };
 
-  const onSubmit = (data) => {
-    const formData = new FormData();
-
-    // Text fields
-    formData.append("title", data.title);
-    formData.append("description", data.description);
-
-    // Image handling
-    if (imageFile) {
-      formData.append("image", imageFile); // new image
-    } else if (removeImage) {
-      formData.append("removeImage", "true"); // remove existing
+  const onSubmit = async (data) => {
+    try {
+      const formData = new FormData();
+      if (data.title) formData.append("title", data.title);
+      if (data.description) formData.append("description", data.description);
+      if (imageFile) formData.append("image", imageFile);
+      if (videoFile) formData.append("video", videoFile);
+      const bannerId = item?.id ?? item?.banner_id;
+      await editBanner({ bannerId, body: formData }).unwrap();
+      message.success("Banner updated");
+      onClose?.();
+    } catch {
+      message.error("Failed to update banner");
     }
-    // If neither → keep existing (backend logic)
-
-    // Video handling
-    if (videoFile) {
-      formData.append("video", videoFile);
-    } else if (removeVideo) {
-      formData.append("removeVideo", "true");
-    }
-
-    console.log("Submitting Edit Banner FormData:");
-    for (let [key, value] of formData.entries()) {
-      console.log(`${key}:`, value);
-    }
-
-    // → axios.put(`/api/banners/${item.id}`, formData)
-
-    onClose?.();
   };
 
   return (
@@ -190,12 +177,7 @@ const EditBanner = ({ item, onClose }) => {
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 pt-6">
-        <button
-          type="submit"
-          className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base"
-        >
-          Save
-        </button>
+        <button type="submit" disabled={isLoading} className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base disabled:opacity-60">{isLoading ? "Saving..." : "Save"}</button>
         <button
           type="button"
           onClick={onClose}
