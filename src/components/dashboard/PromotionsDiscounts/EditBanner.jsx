@@ -22,6 +22,7 @@ const EditBanner = ({ item, onClose }) => {
     if (item) {
       setValue("title", item.title || "");
       setValue("description", item.description || "");
+      setValue("isActive", !!(item.is_active ?? (item.status === "active")));
 
       // Show existing media
       setImagePreview(item.image || null);
@@ -70,6 +71,7 @@ const EditBanner = ({ item, onClose }) => {
       const formData = new FormData();
       if (data.title) formData.append("title", data.title);
       if (data.description) formData.append("description", data.description);
+      if (typeof data.isActive === "boolean") formData.append("is_active", String(data.isActive));
       if (imageFile) formData.append("image", imageFile);
       if (videoFile) formData.append("video", videoFile);
       const bannerId = item?.id ?? item?.banner_id;
@@ -104,6 +106,18 @@ const EditBanner = ({ item, onClose }) => {
           rows={4}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
         />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <input
+          id="banner-active"
+          type="checkbox"
+          {...register("isActive")}
+          className="h-4 w-4 text-primary border-gray-300 rounded"
+        />
+        <label htmlFor="banner-active" className="text-sm md:text-base text-gray-700">
+          Active
+        </label>
       </div>
 
       <div>

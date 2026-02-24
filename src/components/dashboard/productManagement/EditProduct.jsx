@@ -1,6 +1,8 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { Trash2, Upload, X } from "lucide-react";
 import { useListColorsQuery } from "../../../redux/features/dashboard/color.api";
+import { useEditProductMutation } from "../../../redux/features/dashboard/product.api";
+import { message } from "antd";
 
 /* ---------- SIZE DATA ---------- */
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
@@ -102,6 +104,7 @@ const getColorNameFromHex = (hex) => {
 /* ---------- EDIT PRODUCT COMPONENT ---------- */
 const EditProduct = ({ product, onClose, onSave }) => {
   const { data: apiColors = [] } = useListColorsQuery();
+  const [editProduct, { isLoading: saving }] = useEditProductMutation();
 
   /* ---------- STATE ---------- */
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -131,14 +134,14 @@ const EditProduct = ({ product, onClose, onSave }) => {
     if (product) {
       // Set form data from product
       setFormData({
-        productName: product.name || "",
-        productDetails: product.description || "",
+        productName: product.name || product.product_name || "",
+        productDetails: product.description || product.subtitle || product.product_description || "",
         careInstruction: product.careInstruction || "",
-        price: product.price || "",
+        price: product.price || product.product_price || "",
         discount: product.discount || "",
         discountFrom: product.discountFrom || "",
         discountTo: product.discountTo || "",
-        stockQuantity: product.stockQuantity || "",
+        stockQuantity: product.stockQuantity ?? product.currentStock ?? product.current_stock ?? "",
         tag: product.tag || "",
       });
 
@@ -147,36 +150,30 @@ const EditProduct = ({ product, onClose, onSave }) => {
       setSelectedSubCategory(product.subCategory || "");
 
       // Set images
-      const productImages = product.images || (product.image ? [product.image] : []);
+      const productImages = product.images || (product.image ? [product.image] : (product.product_main_image ? [product.product_main_image] : []));
       setExistingImages(productImages);
       setImages([]);
 
       // Set sizes and colors from product data
-      if (product.sizeStock && product.sizeStock.length > 0) {
-        const sizes = [...new Set(product.sizeStock.map(item => item.size))];
-        const colors = [...new Set(product.sizeStock.map(item => item.color || "#000000"))];
-
+      const srcRows = product.sizeStock && product.sizeStock.length > 0
+        ? product.sizeStock
+        : (product.variants && product.variants.length > 0
+            ? product.variants.map(v => ({
+                size: v.size,
+                color: v.color_hex || (v.color ? (COLOR_HEX_MAP[v.color] || "#000000") : "#000000"),
+                initial: (typeof v.current_stock === "number" && typeof v.number_of_purches === "number")
+                  ? v.current_stock + v.number_of_purches
+                  : 0,
+                current: v.current_stock ?? 0,
+                sold: v.number_of_purches ?? 0,
+              }))
+            : []);
+      if (srcRows.length > 0) {
+        const sizes = [...new Set(srcRows.map(item => item.size))];
+        const colorNames = [...new Set(srcRows.map(item => getColorNameFromHex(item.color)))].filter(n => n && n !== "Unknown" && n !== "Select color");
         setSelectedSizes(sizes);
-        setSelectedColors(colors);
-        setStockRows(product.sizeStock.map(item => ({
-          size: item.size,
-          color: item.color || "#000000",
-          initial: item.initial || 0,
-          current: item.current || 0,
-          sold: item.sold || 0,
-        })));
-      } else {
-        // Default data if no product data
-        const defaultRows = [
-          { size: "M", color: "#000000", initial: 100, current: 45, sold: 55 },
-          { size: "M", color: "#0000FF", initial: 150, current: 65, sold: 85 },
-          { size: "XL", color: "#000000", initial: 150, current: 92, sold: 58 },
-          { size: "XL", color: "#008000", initial: 100, current: 64, sold: 36 },
-          { size: "M", color: "#87CEEB", initial: 120, current: 75, sold: 45 },
-        ];
-        setStockRows(defaultRows);
-        setSelectedSizes(["M", "XL"]);
-        setSelectedColors(["Black", "Blue", "Green", "Sky Blue"]);
+        setSelectedColors(colorNames);
+        setStockRows(srcRows);
       }
     }
   }, [product]);
@@ -306,22 +303,59 @@ const EditProduct = ({ product, onClose, onSave }) => {
   };
 
   /* ---------- FORM SUBMISSION ---------- */
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    try {
+      const productId = product?.id ?? product?.product_id;
+      const fd = new FormData();
+      if (formData.productName) fd.append("name", formData.productName);
+      if (formData.productDetails) fd.append("description", formData.productDetails);
+      if (formData.careInstruction) fd.append("care_instructions", formData.careInstruction);
+      if (formData.price !== "") fd.append("price", String(formData.price));
+      if (formData.discount !== "") fd.append("discount", String(formData.discount));
 
-    const updatedData = {
-      ...formData,
-      category: selectedCategory,
-      subCategory: selectedSubCategory,
-      existingImages,
-      newImages: images.map(img => img.file),
-      sizeStock: stockRows,
-    };
+      // Colors payload [{name, hex_code}]
+      const colorSet = new Set(selectedColors);
+      const colorsPayload = Array.from(colorSet).map(name => ({
+        name,
+        hex_code: COLOR_HEX_MAP[name] || "#000000",
+      }));
+      if (colorsPayload.length > 0) {
+        fd.append("colors", JSON.stringify(colorsPayload));
+      }
 
-    console.log("Updated Product Data:", updatedData);
-    onSave?.(updatedData);
-    onClose?.();
-    alert("Product updated successfully!");
+      // Variants payload [{size, stock_quantity, in_stock, color_name}]
+      const variantsPayload = stockRows.map(row => ({
+        size: row.size,
+        stock_quantity: Number(row.current) || 0,
+        in_stock: (Number(row.current) || 0) > 0,
+        color_name: getColorNameFromHex(row.color),
+      }));
+      if (variantsPayload.length > 0) {
+        fd.append("variants", JSON.stringify(variantsPayload));
+      }
+
+      // Tags (single tag field to array)
+      if (formData.tag) {
+        fd.append("tags", JSON.stringify([{ name: String(formData.tag).trim(), slug: String(formData.tag).trim().toLowerCase().replace(/\s+/g, "-") }]));
+      }
+
+      // Photos
+      images.forEach(img => {
+        if (img?.file) fd.append("photos", img.file);
+      });
+      // If user removed all existing images and there were some before, clear old
+      if ((existingImages?.length ?? 0) === 0 && (product?.images?.length > 0 || product?.image || product?.product_main_image)) {
+        fd.append("clear_photos", "true");
+      }
+
+      await editProduct({ productId, body: fd }).unwrap();
+      message.success("Product updated");
+      onSave?.();
+      onClose?.();
+    } catch {
+      message.error("Failed to update product");
+    }
   };
 
   /* ---------- CANCEL ---------- */
@@ -676,6 +710,7 @@ const EditProduct = ({ product, onClose, onSave }) => {
         <button
           className="flex-1 bg-[#6E0B0B] text-white py-3 rounded-lg font-medium hover:bg-[#5a0909] transition-colors"
           onClick={handleSubmit}
+          disabled={saving}
         >
           Update Product
         </button>

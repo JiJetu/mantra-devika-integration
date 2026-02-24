@@ -1,10 +1,25 @@
 import { useForm } from "react-hook-form";
+import { message } from "antd";
+import { useCreateHeadingMutation } from "../../../redux/features/dashboard/promotion";
 
-const AddHeadingAnnouncement = () => {
+const AddHeadingAnnouncement = ({ onClose }) => {
   const { register, handleSubmit } = useForm();
+  const [createHeading, { isLoading }] = useCreateHeadingMutation();
 
-  const onSubmit = (data) => {
-    console.log("New Announcement:", data);
+  const onSubmit = async (data) => {
+    try {
+      const body = {
+        title: data.title,
+        start_date: data.startDate || "",
+        end_date: data.endDate || "",
+        is_active: true,
+      };
+      await createHeading(body).unwrap();
+      message.success("Heading announcement created");
+      onClose?.();
+    } catch {
+      message.error("Failed to create heading announcement");
+    }
   };
 
   return (
@@ -51,14 +66,10 @@ const AddHeadingAnnouncement = () => {
 
       {/* Buttons */}
       <div className="flex flex-col md:flex-row gap-4 pt-6">
-        <button
-          type="submit"
-          className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base"
-        >
-          Save
-        </button>
+        <button type="submit" disabled={isLoading} className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base disabled:opacity-60">{isLoading ? "Saving..." : "Save"}</button>
         <button
           type="button"
+          onClick={onClose}
           className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium text-base"
         >
           Cancel

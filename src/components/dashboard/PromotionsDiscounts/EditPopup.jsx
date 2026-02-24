@@ -1,22 +1,26 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { X } from "lucide-react";
+import { message } from "antd";
+import { useEditPopupMutation } from "../../../redux/features/dashboard/promotion";
 
-const EditPopup = ({ item }) => {
+const EditPopup = ({ item, onClose }) => {
   const { register, handleSubmit, setValue, reset } = useForm();
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [editPopup, { isLoading }] = useEditPopupMutation();
 
   // Prefill form values when `item` changes
   useEffect(() => {
     if (item) {
       setValue("title", item.title || "");
-      setValue("shortDescription", item.shortDescription || "");
-      setValue("startDate", item.startDate || "");
-      setValue("endDate", item.endDate || "");
+      setValue("shortDescription", item.shortDescription || item.description || "");
+      setValue("startDate", item.startDate || item.start_date || "");
+      setValue("endDate", item.endDate || item.end_date || "");
+      setValue("isActive", !!(item.is_active ?? (item.status === "active")));
 
-      if (item.popupImage) {
-        setPreviewImage(item.popupImage); // Can be a URL from server
+      if (item.popupImage || item.image) {
+        setPreviewImage(item.popupImage || item.image);
       }
     }
   }, [item, setValue]);
@@ -34,26 +38,22 @@ const EditPopup = ({ item }) => {
     setSelectedFile(null);
   };
 
-  const onSubmit = (data) => {
-    const formData = new FormData();
-    formData.append("title", data.title);
-    formData.append("shortDescription", data.shortDescription);
-    formData.append("startDate", data.startDate);
-    formData.append("endDate", data.endDate);
-
-    if (selectedFile) {
-      formData.append("popupImage", selectedFile);
+  const onSubmit = async (data) => {
+    try {
+      const formData = new FormData();
+      if (data.title) formData.append("title", data.title);
+      if (data.shortDescription) formData.append("description", data.shortDescription);
+      if (data.startDate) formData.append("start_date", data.startDate);
+      if (data.endDate) formData.append("end_date", data.endDate);
+      if (selectedFile) formData.append("image", selectedFile);
+      if (typeof data.isActive === "boolean") formData.append("is_active", String(data.isActive));
+      const announcementId = item?.id ?? item?.announcement_id;
+      await editPopup({ announcementId, body: formData }).unwrap();
+      message.success("Pop-up updated");
+      onClose?.();
+    } catch {
+      message.error("Failed to update pop-up");
     }
-
-    console.log("Submitting Edit Pop-up FormData:");
-    for (let [key, value] of formData.entries()) {
-      console.log(`${key}:`, value);
-    }
-
-    // Reset form if needed
-    // reset();
-    // setPreviewImage(null);
-    // setSelectedFile(null);
   };
 
   return (
@@ -133,29 +133,40 @@ const EditPopup = ({ item }) => {
           />
         </div>
       </div>
+      
+       {/* Active Toggle */}
+      <div className="flex items-center gap-3 mt-2">
+        <input
+          id="popup-active"
+          type="checkbox"
+          {...register("isActive")}
+          className="h-4 w-4 text-primary border-gray-300 rounded"
+        />
+        <label htmlFor="popup-active" className="text-sm text-gray-700">
+          Active
+        </label>
+      </div>
 
       {/* Buttons */}
       <div className="flex gap-3 mt-4">
-        <button
-          type="submit"
-          className="flex-1 py-2 bg-primary text-white rounded-lg transition-colors font-medium"
-        >
-          Save
-        </button>
+        <button type="submit" disabled={isLoading} className="flex-1 py-2 bg-primary text-white rounded-lg transition-colors font-medium disabled:opacity-60">{isLoading ? "Saving..." : "Save"}</button>
         <button
           type="button"
           onClick={() => {
             reset();
             removePreview();
-            if (item && item.popupImage) {
-              setPreviewImage(item.popupImage); // reset to original image
+            if (item && (item.popupImage || item.image)) {
+              setPreviewImage(item.popupImage || item.image);
             }
+            onClose?.();
           }}
           className="py-2 px-4 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors font-medium"
         >
           Cancel
         </button>
       </div>
+      
+     
     </form>
   );
 };

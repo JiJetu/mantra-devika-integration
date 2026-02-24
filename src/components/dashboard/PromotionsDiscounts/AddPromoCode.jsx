@@ -1,11 +1,28 @@
 import { useForm } from "react-hook-form";
 import CustomSelect from "../../ui/CustomSelect";
+import { message } from "antd";
+import { useCreateCouponMutation } from "../../../redux/features/dashboard/promotion";
 
-const AddPromoCode = () => {
-  const { register, handleSubmit } = useForm();
+const AddPromoCode = ({ onClose }) => {
+  const { register, handleSubmit, reset } = useForm();
+  const [createCoupon, { isLoading }] = useCreateCouponMutation();
 
-  const onSubmit = (data) => {
-    console.log("New Promo Code:", data);
+  const onSubmit = async (data) => {
+    try {
+      const body = {
+        code: data.code,
+        discount_percentage: Number(data.discount) || 0,
+        max_discount_amount: Number(data.maxDiscount) || 0,
+        valid_from: data.startDate || "",
+        valid_to: data.endDate || "",
+      };
+      await createCoupon(body).unwrap();
+      message.success("Coupon created");
+      reset();
+      onClose?.();
+    } catch {
+      message.error("Failed to create coupon");
+    }
   };
 
   return (
@@ -93,12 +110,14 @@ const AddPromoCode = () => {
       <div className="flex flex-col md:flex-row gap-4 pt-6">
         <button
           type="submit"
-          className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base"
+          disabled={isLoading}
+          className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-base disabled:opacity-60"
         >
           Save
         </button>
         <button
           type="button"
+          onClick={onClose}
           className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium text-base"
         >
           Cancel

@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { X } from "lucide-react";
+import { message } from "antd";
+import { useCreatePopupMutation } from "../../../redux/features/dashboard/promotion";
 
-const AddPopup = () => {
+const AddPopup = ({ onClose }) => {
   const { register, handleSubmit, reset } = useForm();
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [createPopup, { isLoading }] = useCreatePopupMutation();
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -20,26 +23,23 @@ const AddPopup = () => {
     setSelectedFile(null);
   };
 
-  const onSubmit = (data) => {
-    const formData = new FormData();
-    formData.append("title", data.title);
-    formData.append("shortDescription", data.shortDescription);
-    formData.append("startDate", data.startDate);
-    formData.append("endDate", data.endDate);
-
-    if (selectedFile) {
-      formData.append("popupImage", selectedFile);
+  const onSubmit = async (data) => {
+    try {
+      const formData = new FormData();
+      formData.append("title", data.title);
+      formData.append("description", data.shortDescription || "");
+      formData.append("start_date", data.startDate || "");
+      formData.append("end_date", data.endDate || "");
+      if (selectedFile) formData.append("image", selectedFile);
+      await createPopup(formData).unwrap();
+      message.success("Pop-up created");
+      reset();
+      setPreviewImage(null);
+      setSelectedFile(null);
+      onClose?.();
+    } catch {
+      message.error("Failed to create pop-up");
     }
-
-    console.log("Submitting Pop-up FormData:");
-    for (let [key, value] of formData.entries()) {
-      console.log(`${key}:`, value);
-    }
-
-    // Reset form
-    reset();
-    setPreviewImage(null);
-    setSelectedFile(null);
   };
 
   return (
@@ -124,17 +124,13 @@ const AddPopup = () => {
 
       {/* Buttons */}
       <div className="flex gap-3 mt-4">
-        <button
-          type="submit"
-          className="flex-1 py-2 bg-red-900 text-white rounded-lg hover:bg-red-800 transition-colors font-medium"
-        >
-          Save
-        </button>
+        <button type="submit" disabled={isLoading} className="flex-1 py-2 bg-red-900 text-white rounded-lg hover:bg-red-800 transition-colors font-medium disabled:opacity-60">{isLoading ? "Saving..." : "Save"}</button>
         <button
           type="button"
           onClick={() => {
             reset();
             removePreview();
+            onClose?.();
           }}
           className="py-2 px-4 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors font-medium"
         >

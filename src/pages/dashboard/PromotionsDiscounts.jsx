@@ -10,8 +10,9 @@ import AddPromoCode from "../../components/dashboard/PromotionsDiscounts/AddProm
 import EditPromoCode from "../../components/dashboard/PromotionsDiscounts/EditPromoCode";
 import AddPopup from "../../components/dashboard/PromotionsDiscounts/AddPopup";
 import { IMAGES } from "../../assets";
+import Pagination from "../../components/shared/Pagination";
 import EditPopup from "../../components/dashboard/PromotionsDiscounts/EditPopup";
-import { useListBannersQuery, useDeleteBannerMutation } from "../../redux/features/dashboard/promotion";
+import { useListBannersQuery, useDeleteBannerMutation, useListHeadingsQuery, useDeleteHeadingMutation, useListPopupsQuery, useDeletePopupMutation, useListCouponsQuery, useDeleteCouponMutation } from "../../redux/features/dashboard/promotion";
 import { message } from "antd";
 
 // Fake data for sections other than banners
@@ -25,21 +26,6 @@ const fakeHeadingAnnouncements = [
   {
     id: 2,
     title: "NEWUSER10",
-    status: "active",
-  },
-];
-
-const fakePromoCodes = [
-  {
-    id: 1,
-    code: "SUMMER20",
-    discount: 20,
-    status: "active",
-  },
-  {
-    id: 2,
-    code: "NEWUSER10",
-    discount: 10,
     status: "active",
   },
 ];
@@ -58,6 +44,17 @@ const PromotionsDiscounts = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const { data: bannersData, isFetching: loadingBanners } = useListBannersQuery();
   const [deleteBanner, { isLoading: deleting }] = useDeleteBannerMutation();
+  const { data: headingsData, isFetching: loadingHeadings } = useListHeadingsQuery(undefined, { skip: activeTab !== "headingAnnouncement" });
+  const [deleteHeading, { isLoading: deletingHeading }] = useDeleteHeadingMutation();
+  const { data: popupsData, isFetching: loadingPopups } = useListPopupsQuery(undefined, { skip: activeTab !== "popUps" });
+  const [deletePopup, { isLoading: deletingPopup }] = useDeletePopupMutation();
+  const [couponPage, setCouponPage] = useState(1);
+  const couponPageSize = 10;
+  const { data: couponsData, isFetching: loadingCoupons } = useListCouponsQuery(
+    { page: couponPage, page_size: couponPageSize },
+    { skip: activeTab !== "promoCode" }
+  );
+  const [deleteCoupon, { isLoading: deletingCoupon }] = useDeleteCouponMutation();
 
   const openModal = (type, item = null) => {
     setModalType(type);
@@ -84,11 +81,36 @@ const PromotionsDiscounts = () => {
       case "websiteBanners":
         return mapBanners(bannersData);
       case "headingAnnouncement":
-        return fakeHeadingAnnouncements;
+        return (Array.isArray(headingsData) ? headingsData : []).map((h, idx) => ({
+          id: h.announcement_id ?? h.id ?? idx + 1,
+          title: h.title ?? "",
+          status: h.is_active ? "active" : "inactive",
+          startDate: h.start_date,
+          endDate: h.end_date,
+        }));
       case "promoCode":
-        return fakePromoCodes;
+        {
+          const list = Array.isArray(couponsData) ? couponsData : (couponsData?.results ?? []);
+          return list.map((c, idx) => ({
+            id: c.cupon_id ?? c.coupon_id ?? c.id ?? idx + 1,
+            code: c.code ?? "",
+            discount: parseFloat(c.discount_percentage) || c.discount || 0,
+            maxDiscount: parseFloat(c.max_discount_amount) || 0,
+            status: c.active ? "active" : "inactive",
+            startDate: c.valid_from,
+            endDate: c.valid_to,
+          }));
+        }
       case "popUps":
-        return fakePopups;
+        return (Array.isArray(popupsData) ? popupsData : []).map((p, idx) => ({
+          id: p.announcement_id ?? p.id ?? idx + 1,
+          image: p.image ?? p.image_url ?? IMAGES.product,
+          title: p.title ?? "",
+          description: p.description ?? "",
+          status: p.is_active ? "active" : "inactive",
+          startDate: p.start_date,
+          endDate: p.end_date,
+        }));
       default:
         return [];
     }
@@ -142,13 +164,22 @@ const PromotionsDiscounts = () => {
   const headers = getHeaders();
 
   const handleDelete = async (item) => {
-    if (activeTab !== "websiteBanners") return;
     try {
-      const id = item.id;
-      await deleteBanner(id).unwrap();
-      message.success("Banner deleted");
+      if (activeTab === "websiteBanners") {
+        await deleteBanner(item.id).unwrap();
+        message.success("Banner deleted");
+      } else if (activeTab === "headingAnnouncement") {
+        await deleteHeading(item.id).unwrap();
+        message.success("Heading announcement deleted");
+      } else if (activeTab === "promoCode") {
+        await deleteCoupon(item.id).unwrap();
+        message.success("Coupon deleted");
+      } else if (activeTab === "popUps") {
+        await deletePopup(item.id).unwrap();
+        message.success("Pop-up deleted");
+      }
     } catch {
-      message.error("Failed to delete banner");
+      message.error("Delete failed");
     }
   };
 
@@ -222,7 +253,7 @@ const PromotionsDiscounts = () => {
         {/* Conditional Render: List for websiteBanners, Table for others */}
         {activeTab === "websiteBanners" || activeTab === "popUps" ? (
           <div className="space-y-2 md:space-y-3 lg:space-y-4">
-            {activeTab === "websiteBanners" && loadingBanners ? (
+            {(activeTab === "websiteBanners" && loadingBanners) || (activeTab === "popUps" && loadingPopups) ? (
               <div className="p-6 text-center text-gray-500">Loading...</div>
             ) : tabData.map((item) => (
               <div
@@ -260,7 +291,7 @@ const PromotionsDiscounts = () => {
                   </button>
                   <button
                     onClick={() => handleDelete(item)}
-                    disabled={deleting && activeTab === "websiteBanners"}
+                    disabled={(deleting && activeTab === "websiteBanners") || (deletingPopup && activeTab === "popUps")}
                     className="text-red-600 hover:text-red-800 transition-colors disabled:opacity-60"
                   >
                     <Trash2 size={18} />
@@ -286,7 +317,9 @@ const PromotionsDiscounts = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {tabData.map((item) => (
+                  {(activeTab === "headingAnnouncement" && loadingHeadings) || (activeTab === "promoCode" && loadingCoupons) ? (
+                    <tr><td className="px-6 py-4" colSpan={headers.length}>Loading...</td></tr>
+                  ) : tabData.map((item) => (
                     <tr
                       key={item.id}
                       className={`hover:bg-gray-50 transition-colors text-start`}
@@ -314,7 +347,11 @@ const PromotionsDiscounts = () => {
                         >
                           <SquarePen size={18} />
                         </button>
-                        <button className="text-red-600 hover:text-red-800 transition-colors">
+                        <button
+                          onClick={() => handleDelete(item)}
+                          disabled={(activeTab === "headingAnnouncement" && deletingHeading) || (activeTab === "promoCode" && deletingCoupon)}
+                          className="text-red-600 hover:text-red-800 transition-colors disabled:opacity-60"
+                        >
                           <Trash2 size={18} />
                         </button>
                       </td>
@@ -323,6 +360,15 @@ const PromotionsDiscounts = () => {
                 </tbody>
               </table>
             </div>
+            {activeTab === "promoCode" && (
+              <Pagination
+                currentPage={couponPage}
+                pageSize={couponPageSize}
+                totalCount={couponsData?.count ?? (Array.isArray(couponsData?.results) ? couponsData.results.length : 0)}
+                totalPages={couponsData?.total_pages}
+                onPageChange={(page) => setCouponPage(page)}
+              />
+            )}
           </div>
         )}
       </div>
@@ -352,7 +398,7 @@ const PromotionsDiscounts = () => {
         title="Create Heading Announcement"
         className="max-w-md md:max-w-lg lg:max-w-xl"
       >
-        <AddHeadingAnnouncement />
+        <AddHeadingAnnouncement onClose={closeModal} />
       </Modal>
 
       <Modal
@@ -361,7 +407,7 @@ const PromotionsDiscounts = () => {
         title="Edit Heading Announcement"
         className="max-w-md md:max-w-lg lg:max-w-xl"
       >
-        <EditHeadingAnnouncement item={selectedItem} />
+        <EditHeadingAnnouncement item={selectedItem} onClose={closeModal} />
       </Modal>
 
       <Modal
@@ -370,7 +416,7 @@ const PromotionsDiscounts = () => {
         title="Add Promo Code"
         className="max-w-md md:max-w-lg lg:max-w-xl"
       >
-        <AddPromoCode />
+        <AddPromoCode onClose={closeModal} />
       </Modal>
 
       <Modal
@@ -379,7 +425,7 @@ const PromotionsDiscounts = () => {
         title="Edit Promo Code"
         className="max-w-md md:max-w-lg lg:max-w-xl"
       >
-        <EditPromoCode item={selectedItem} />
+        <EditPromoCode item={selectedItem} onClose={closeModal} />
       </Modal>
 
       <Modal
@@ -388,7 +434,7 @@ const PromotionsDiscounts = () => {
         title="Create Pop-up"
         className="max-w-md md:max-w-lg lg:max-w-xl"
       >
-        <AddPopup />
+        <AddPopup onClose={closeModal} />
       </Modal>
 
       <Modal
@@ -397,7 +443,7 @@ const PromotionsDiscounts = () => {
         title="Edit Pop-up"
         className="max-w-md md:max-w-lg lg:max-w-xl"
       >
-        <EditPopup item={selectedItem} />
+        <EditPopup item={selectedItem} onClose={closeModal} />
       </Modal>
     </>
   );

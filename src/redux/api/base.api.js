@@ -35,6 +35,8 @@ export const baseApi = createApi({
     "MostVisitedPages",
     "ProductEngagementInsights",
     "Banners",
+    "Announcements",
+    "Coupons",
     "ProductPopularity",
     "Policies",
     "Customers",

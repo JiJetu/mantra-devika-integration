@@ -24,11 +24,25 @@ const EditCategory = ({ category, onClose }) => {
       setSelectedFile(null);
       setWearType(category.wear_type ?? category?.wearType ?? "");
       try {
-        const sg = category.size_guide ?? category?.sizeGuide;
-        if (Array.isArray(sg)) setSizeGuide(sg);
+        const sg = category.size_guides ?? category.size_guide ?? category?.sizeGuide;
+        if (Array.isArray(sg)) {
+          const normalized = sg.map((item) =>
+            item && typeof item === "object" && "size_name" in item
+              ? { title: item.size_name, value: item.size }
+              : item
+          );
+          setSizeGuide(normalized);
+        }
         else if (typeof sg === "string") {
           const parsed = JSON.parse(sg);
-          if (Array.isArray(parsed)) setSizeGuide(parsed);
+          if (Array.isArray(parsed)) {
+            const normalized = parsed.map((item) =>
+              item && typeof item === "object" && "size_name" in item
+                ? { title: item.size_name, value: item.size }
+                : item
+            );
+            setSizeGuide(normalized);
+          }
         }
       } catch {
         setSizeGuide([]);
@@ -50,12 +64,22 @@ const EditCategory = ({ category, onClose }) => {
   };
 
   const onSubmit = async (data) => {
+    if (sizeGuide.length === 0) {
+      message.error("Please add at least one size guide");
+      return;
+    }
     const formData = new FormData();
     formData.append("name", data.name);
     formData.append("description", data.description);
     formData.append("is_active", data.is_active ? "true" : "false");
     if (wearType) formData.append("wear_type", wearType);
-    if (sizeGuide.length > 0) formData.append("size_guide", JSON.stringify(sizeGuide));
+    {
+      const apiGuides = sizeGuide.map((g) => ({
+        size_name: g.title,
+        size: g.value,
+      }));
+      formData.append("size_guides", JSON.stringify(apiGuides));
+    }
     if (selectedFile) {
       formData.append("photo", selectedFile);
     }
@@ -137,10 +161,10 @@ const EditCategory = ({ category, onClose }) => {
         </label>
         <CustomSelect
           options={[
-            { label: "Upper Body wear", value: "upper_body" },
-            { label: "Lower Body wear", value: "lower_body" },
-            { label: "Footwear", value: "footwear" },
-            { label: "Accessories", value: "accessories" },
+            { label: "Upper Body wear", value: "UPPER" },
+            { label: "Lower Body wear", value: "LOWER" },
+            { label: "Footwear", value: "FOOTWEAR" },
+            { label: "Accessories", value: "ACCESSORIES" },
           ]}
           placeholder="Select wear type"
           value={wearType}
@@ -156,7 +180,7 @@ const EditCategory = ({ category, onClose }) => {
         </label>
         <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_auto] gap-3">
           <CustomSelect
-            options={["XS", "S", "M", "L", "XL", "XXL", "3XL"].map((s) => ({
+            options={["XS", "S", "M", "L", "XL"].map((s) => ({
               label: s,
               value: s,
             }))}
@@ -167,6 +191,7 @@ const EditCategory = ({ category, onClose }) => {
           />
           <input
             value={sizeValue}
+            type="number"
             onChange={(e) => setSizeValue(e.target.value)}
             placeholder="Size value"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"

@@ -17,12 +17,14 @@ const CategoriesManagement = () => {
   const [deleteCategory] = useDeleteCategoryMutation();
   const [deletingId, setDeletingId] = useState(null);
   const categories = (data ?? []).map((c, idx) => ({
-    id: c.category_id ?? idx + 1,
+    id: c.category_id ?? c.id ?? idx + 1,
     name: c.name,
     description: c.description || "",
     productCount: c.total_number_of_product ?? 0,
     status: c.is_active ? "active" : "inactive",
     image: sanitizeUrl(c.photo),
+    wear_type: c.wear_type ?? c.wearType ?? "",
+    size_guides: Array.isArray(c.size_guides) ? c.size_guides : [],
   }));
 
   const openModal = (type, category = null) => {
