@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2, Palette } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useListColorsQuery,
@@ -19,12 +19,16 @@ const AddColorModalContent = () => {
   const handleAddColor = async () => {
     if (!colorName.trim() || !colorHex) return;
     try {
-      await createColor({ colors: [{ name: colorName.trim(), hex_code: colorHex }] }).unwrap();
+      await createColor({ name: colorName.trim(), hex_code: colorHex }).unwrap();
       toast.success("Color added!");
       setColorName("");
       setColorHex("#000000");
-    } catch {
-      toast.error("Failed to add color");
+    } catch (err) {
+      const msg =
+        err?.data?.detail ||
+        err?.data?.message ||
+        "Failed to add color";
+      toast.error(msg);
     }
   };
 

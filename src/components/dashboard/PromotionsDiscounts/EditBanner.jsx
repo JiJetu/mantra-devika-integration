@@ -16,6 +16,7 @@ const EditBanner = ({ item, onClose }) => {
   // Video state
   const [videoPreview, setVideoPreview] = useState(null);
   const [videoFile, setVideoFile] = useState(null);
+  const [videoName, setVideoName] = useState("");
   const [removeVideo, setRemoveVideo] = useState(false);
 
   useEffect(() => {
@@ -23,10 +24,20 @@ const EditBanner = ({ item, onClose }) => {
       setValue("title", item.title || "");
       setValue("description", item.description || "");
       setValue("isActive", !!(item.is_active ?? (item.status === "active")));
+      const sd = item.startDate || item.start_date;
+      const ed = item.endDate || item.end_date;
+      if (sd) setValue("startDate", String(sd).slice(0, 10));
+      if (ed) setValue("endDate", String(ed).slice(0, 10));
 
       // Show existing media
       setImagePreview(item.image || null);
       setVideoPreview(item.video || null);
+      try {
+        const vn = (item.video || "").split("/").pop() || "";
+        setVideoName(vn);
+      } catch {
+        setVideoName("");
+      }
 
       // Reset new files/flags
       setImageFile(null);
@@ -50,6 +61,7 @@ const EditBanner = ({ item, onClose }) => {
     if (file) {
       setVideoFile(file);
       setVideoPreview(URL.createObjectURL(file));
+      setVideoName(file.name);
       setRemoveVideo(false);
     }
   };
@@ -63,6 +75,7 @@ const EditBanner = ({ item, onClose }) => {
   const handleRemoveVideo = () => {
     setVideoPreview(null);
     setVideoFile(null);
+    setVideoName("");
     setRemoveVideo(true);
   };
 
@@ -71,6 +84,8 @@ const EditBanner = ({ item, onClose }) => {
       const formData = new FormData();
       if (data.title) formData.append("title", data.title);
       if (data.description) formData.append("description", data.description);
+      if (data.startDate) formData.append("start_date", data.startDate);
+      if (data.endDate) formData.append("end_date", data.endDate);
       if (typeof data.isActive === "boolean") formData.append("is_active", String(data.isActive));
       if (imageFile) formData.append("image", imageFile);
       if (videoFile) formData.append("video", videoFile);
@@ -106,6 +121,30 @@ const EditBanner = ({ item, onClose }) => {
           rows={4}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
         />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm text-gray-700 mb-1 md:mb-2">
+            Start Date
+          </label>
+          <input
+            type="date"
+            {...register("startDate")}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm text-gray-700 mb-1 md:mb-2">
+            End Date
+          </label>
+          <input
+            type="date"
+            {...register("endDate")}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm"
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
@@ -172,20 +211,25 @@ const EditBanner = ({ item, onClose }) => {
           </label>
         </div>
 
-        {videoPreview && (
-          <div className="mt-4 relative inline-block">
-            <video
-              src={videoPreview}
-              controls
-              className="w-20 h-20 object-cover rounded border border-gray-300"
-            />
-            <button
-              type="button"
-              onClick={handleRemoveVideo}
-              className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 shadow-md"
-            >
-              <X size={14} />
-            </button>
+        {(videoPreview || videoName) && (
+          <div className="mt-4 flex items-center gap-3">
+            {videoPreview ? (
+              <video
+                src={videoPreview}
+                controls
+                className="w-28 h-20 object-cover rounded border border-gray-300"
+              />
+            ) : null}
+            <div className="flex items-center gap-2">
+              {videoName && <span className="text-sm text-gray-700">{videoName}</span>}
+              <button
+                type="button"
+                onClick={handleRemoveVideo}
+                className="bg-red-600 text-white rounded px-2 py-1 text-xs"
+              >
+                Remove
+              </button>
+            </div>
           </div>
         )}
       </div>

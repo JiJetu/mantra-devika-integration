@@ -1,11 +1,12 @@
-import React, { useState, useRef, useMemo, useEffect } from "react";
-import { Trash2, Upload, X } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Trash2, X } from "lucide-react";
 import { useListColorsQuery } from "../../../redux/features/dashboard/color.api";
+import { useListCategoriesQuery } from "../../../redux/features/dashboard/category";
 import { useEditProductMutation } from "../../../redux/features/dashboard/product.api";
 import { message } from "antd";
 
 /* ---------- SIZE DATA ---------- */
-const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
+// Now driven by selected category's size_guides
 
 /* ---------- COLOR HEX MAPPING ---------- */
 const COLOR_HEX_MAP = {
@@ -40,14 +41,6 @@ const HEX_COLOR_MAP = {
   "#ff00ff": "Pink",
   "#a52a2a": "Brown"
 };
-
-/* ---------- CATEGORY DATA ---------- */
-const CATEGORY_DATA = [
-  { id: 1, name: "Men", subCategories: ["T-Shirt", "Shirt", "Pants", "Jacket"] },
-  { id: 2, name: "Women", subCategories: ["Dress", "Top", "Skirt", "Jeans"] },
-  { id: 3, name: "Kids", subCategories: ["Baby Wear", "School Wear", "Winter Wear"] },
-  { id: 4, name: "Accessories", subCategories: ["Belt", "Cap", "Wallet", "Sunglasses"] },
-];
 
 /* ---------- SIMPLE COLOR NAME HELPER ---------- */
 const getColorNameFromHex = (hex) => {
@@ -103,18 +96,21 @@ const getColorNameFromHex = (hex) => {
 
 /* ---------- EDIT PRODUCT COMPONENT ---------- */
 const EditProduct = ({ product, onClose, onSave }) => {
+  console.log("product", product);
   const { data: apiColors = [] } = useListColorsQuery();
+  const { data: categories = [] } = useListCategoriesQuery();
   const [editProduct, { isLoading: saving }] = useEditProductMutation();
 
   /* ---------- STATE ---------- */
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [selectedSubCategory, setSelectedSubCategory] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [images, setImages] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
   const fileInputRef = useRef(null);
   const [selectedSizes, setSelectedSizes] = useState([]);
   const [selectedColors, setSelectedColors] = useState([]);
   const [stockRows, setStockRows] = useState([]);
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState([]);
 
   /* ---------- FORM DATA ---------- */
   const [formData, setFormData] = useState({
@@ -123,10 +119,7 @@ const EditProduct = ({ product, onClose, onSave }) => {
     careInstruction: "",
     price: "",
     discount: "",
-    discountFrom: "",
-    discountTo: "",
     stockQuantity: "",
-    tag: "",
   });
 
   /* ---------- INITIALIZE WITH PRODUCT DATA ---------- */
@@ -134,43 +127,59 @@ const EditProduct = ({ product, onClose, onSave }) => {
     if (product) {
       // Set form data from product
       setFormData({
-        productName: product.name || product.product_name || "",
-        productDetails: product.description || product.subtitle || product.product_description || "",
-        careInstruction: product.careInstruction || "",
-        price: product.price || product.product_price || "",
-        discount: product.discount || "",
-        discountFrom: product.discountFrom || "",
-        discountTo: product.discountTo || "",
+        productName: product.name ?? product.product_name ?? "",
+        productDetails: product.description ?? product.subtitle ?? product.product_description ?? "",
+        careInstruction: product.care_instructions ?? product.careInstruction ?? "",
+        price: product.price ?? product.product_price ?? "",
+        discount: product.discount ?? "",
+        maxDiscountPrice: product.max_discount_price ?? "",
         stockQuantity: product.stockQuantity ?? product.currentStock ?? product.current_stock ?? "",
-        tag: product.tag || "",
       });
 
-      // Set category and subcategory
-      setSelectedCategory(product.category || "");
-      setSelectedSubCategory(product.subCategory || "");
+      // Set category (optional)
+      setSelectedCategoryId(
+        product.category_id ??
+        product.product_category?.category_id ??
+        ""
+      );
 
       // Set images
       const productImages = product.images || (product.image ? [product.image] : (product.product_main_image ? [product.product_main_image] : []));
       setExistingImages(productImages);
       setImages([]);
 
+      // Prefill tags
+      try {
+        const tgs = Array.isArray(product.tags)
+          ? product.tags.map((t) => (typeof t === "string" ? t : t?.name)).filter(Boolean)
+          : [];
+        setTags(tgs);
+      } catch {
+        setTags([]);
+      }
+
       // Set sizes and colors from product data
-      const srcRows = product.sizeStock && product.sizeStock.length > 0
-        ? product.sizeStock
-        : (product.variants && product.variants.length > 0
-            ? product.variants.map(v => ({
-                size: v.size,
-                color: v.color_hex || (v.color ? (COLOR_HEX_MAP[v.color] || "#000000") : "#000000"),
-                initial: (typeof v.current_stock === "number" && typeof v.number_of_purches === "number")
-                  ? v.current_stock + v.number_of_purches
-                  : 0,
-                current: v.current_stock ?? 0,
-                sold: v.number_of_purches ?? 0,
-              }))
-            : []);
+      const variantsSrc =
+        product.sizeStock && product.sizeStock.length > 0
+          ? product.sizeStock
+          : (product.variants && product.variants.length > 0
+              ? product.variants
+              : (product.product_variant && product.product_variant.length > 0
+                  ? product.product_variant
+                  : []));
+
+      const srcRows = variantsSrc.map((v) => ({
+        size: v.size,
+        color: v.color || getColorNameFromHex(v.color_hex || ""),
+        initial: (typeof v.current_stock === "number" && typeof v.number_of_purches === "number")
+          ? v.current_stock + v.number_of_purches
+          : (typeof v.initial === "number" ? v.initial : 0),
+        current: v.current_stock ?? v.current ?? 0,
+        sold: v.number_of_purches ?? v.sold ?? 0,
+      }));
       if (srcRows.length > 0) {
         const sizes = [...new Set(srcRows.map(item => item.size))];
-        const colorNames = [...new Set(srcRows.map(item => getColorNameFromHex(item.color)))].filter(n => n && n !== "Unknown" && n !== "Select color");
+        const colorNames = [...new Set(srcRows.map(item => item.color))].filter(n => n && n !== "Unknown" && n !== "Select color");
         setSelectedSizes(sizes);
         setSelectedColors(colorNames);
         setStockRows(srcRows);
@@ -178,8 +187,16 @@ const EditProduct = ({ product, onClose, onSave }) => {
     }
   }, [product]);
 
-  const currentCategory = CATEGORY_DATA.find(
-    (cat) => cat.name === selectedCategory
+  /* ---------- CATEGORY + SIZE OPTIONS ---------- */
+  const currentCategory = useMemo(
+    () => (categories || []).find((c) => String(c.id ?? c.category_id) === String(selectedCategoryId)),
+    [categories, selectedCategoryId],
+  );
+  const sizeOptions = useMemo(
+    () => Array.isArray(currentCategory?.size_guides)
+      ? currentCategory.size_guides.map((sg) => sg.size_name).filter(Boolean)
+      : [],
+    [currentCategory],
   );
 
   /* ---------- IMAGE HANDLING ---------- */
@@ -211,35 +228,30 @@ const EditProduct = ({ product, onClose, onSave }) => {
       setSelectedSizes(prev => [...prev, size]);
       // Auto-generate rows for this size with all selected colors
       if (selectedColors.length > 0) {
-        const newRows = selectedColors.map(colorName => {
-          const hexColor = COLOR_HEX_MAP[colorName] || "#000000";
-          return {
-            size,
-            color: hexColor,
-            initial: 0,
-            current: 0,
-            sold: 0,
-          };
-        });
+        const newRows = selectedColors.map(colorName => ({
+          size,
+          color: colorName,
+          initial: 0,
+          current: 0,
+          sold: 0,
+        }));
         setStockRows(prev => [...prev, ...newRows]);
       }
     }
   };
 
   const handleColorSelect = (colorName) => {
-    const hexColor = COLOR_HEX_MAP[colorName] || "#000000";
-
     if (selectedColors.includes(colorName)) {
       setSelectedColors(prev => prev.filter(c => c !== colorName));
       // Remove rows with this color
-      setStockRows(prev => prev.filter(row => row.color !== hexColor));
+      setStockRows(prev => prev.filter(row => row.color !== colorName));
     } else {
       setSelectedColors(prev => [...prev, colorName]);
       // Auto-generate rows for this color with all selected sizes
       if (selectedSizes.length > 0) {
         const newRows = selectedSizes.map(size => ({
           size,
-          color: hexColor,
+          color: colorName,
           initial: 0,
           current: 0,
           sold: 0,
@@ -261,10 +273,9 @@ const EditProduct = ({ product, onClose, onSave }) => {
     }
 
     // Check if this was the last row with this color
-    const colorName = getColorNameFromHex(rowToRemove.color);
-    const hasColor = stockRows.some((row, i) => i !== index && getColorNameFromHex(row.color) === colorName);
+    const hasColor = stockRows.some((row, i) => i !== index && row.color === rowToRemove.color);
     if (!hasColor) {
-      setSelectedColors(prev => prev.filter(color => color !== colorName));
+      setSelectedColors(prev => prev.filter(color => color !== rowToRemove.color));
     }
   };
 
@@ -278,21 +289,6 @@ const EditProduct = ({ product, onClose, onSave }) => {
     );
   };
 
-  /* ---------- UPDATE COLOR VALUE ---------- */
-  const updateColorValue = (index, newHexColor) => {
-    setStockRows(prev =>
-      prev.map((row, i) =>
-        i === index ? { ...row, color: newHexColor } : row
-      )
-    );
-
-    // Update selected colors if needed
-    const colorName = getColorNameFromHex(newHexColor);
-    if (colorName !== "Unknown" && colorName !== "Select color" && !selectedColors.includes(colorName)) {
-      setSelectedColors(prev => [...prev, colorName]);
-    }
-  };
-
   /* ---------- INPUT HANDLING ---------- */
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -300,6 +296,13 @@ const EditProduct = ({ product, onClose, onSave }) => {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleCategoryChange = (e) => {
+    const v = e.target.value;
+    setSelectedCategoryId(v);
+    setSelectedSizes([]);
+    setStockRows([]);
   };
 
   /* ---------- FORM SUBMISSION ---------- */
@@ -313,13 +316,20 @@ const EditProduct = ({ product, onClose, onSave }) => {
       if (formData.careInstruction) fd.append("care_instructions", formData.careInstruction);
       if (formData.price !== "") fd.append("price", String(formData.price));
       if (formData.discount !== "") fd.append("discount", String(formData.discount));
+      if (formData.maxDiscountPrice !== undefined && formData.maxDiscountPrice !== "") {
+        fd.append("max_discount_price", String(formData.maxDiscountPrice));
+      }
+      if (selectedCategoryId) fd.append("category_ids", JSON.stringify([Number(selectedCategoryId)]));
 
       // Colors payload [{name, hex_code}]
       const colorSet = new Set(selectedColors);
-      const colorsPayload = Array.from(colorSet).map(name => ({
-        name,
-        hex_code: COLOR_HEX_MAP[name] || "#000000",
-      }));
+      const colorsPayload = Array.from(colorSet).map(name => {
+        const found = apiColors.find(c => c.name === name);
+        return {
+          name,
+          hex_code: found?.hex_code || found?.color_code || COLOR_HEX_MAP[name] || "#000000",
+        };
+      });
       if (colorsPayload.length > 0) {
         fd.append("colors", JSON.stringify(colorsPayload));
       }
@@ -329,15 +339,15 @@ const EditProduct = ({ product, onClose, onSave }) => {
         size: row.size,
         stock_quantity: Number(row.current) || 0,
         in_stock: (Number(row.current) || 0) > 0,
-        color_name: getColorNameFromHex(row.color),
+        color_name: row.color,
       }));
       if (variantsPayload.length > 0) {
         fd.append("variants", JSON.stringify(variantsPayload));
       }
 
-      // Tags (single tag field to array)
-      if (formData.tag) {
-        fd.append("tags", JSON.stringify([{ name: String(formData.tag).trim(), slug: String(formData.tag).trim().toLowerCase().replace(/\s+/g, "-") }]));
+      // Tags array [{name}]
+      if (tags.length > 0) {
+        fd.append("tags", JSON.stringify(tags.map((t) => ({ name: t }))));
       }
 
       // Photos
@@ -367,7 +377,7 @@ const EditProduct = ({ product, onClose, onSave }) => {
     <div className="bg-white p-6 rounded-xl space-y-6 text-sm lora">
 
       {/* -------- Top Inputs -------- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block mb-1">Product Name</label>
           <input
@@ -381,34 +391,21 @@ const EditProduct = ({ product, onClose, onSave }) => {
         </div>
 
         <div>
-          <label className="block mb-1">Category</label>
+          <label className="block mb-1">Categories</label>
           <select
             className="input"
-            value={selectedCategory}
-            onChange={(e) => {
-              setSelectedCategory(e.target.value);
-              setSelectedSubCategory("");
-            }}
+            value={selectedCategoryId}
+            onChange={handleCategoryChange}
           >
             <option value="">Select Category</option>
-            {CATEGORY_DATA.map((cat) => (
-              <option key={cat.id} value={cat.name}>{cat.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block mb-1">Sub category</label>
-          <select
-            className="input"
-            value={selectedSubCategory}
-            onChange={(e) => setSelectedSubCategory(e.target.value)}
-            disabled={!selectedCategory}
-          >
-            <option value="">Select Sub-Category</option>
-            {currentCategory?.subCategories.map((sub, i) => (
-              <option key={i} value={sub}>{sub}</option>
-            ))}
+            {categories.map((cat) => {
+              const id = cat.id ?? cat.category_id;
+              return (
+                <option key={id} value={id}>
+                  {cat.name}
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>
@@ -438,7 +435,7 @@ const EditProduct = ({ product, onClose, onSave }) => {
       </div>
 
       {/* -------- Pricing -------- */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block mb-1">Price ($)</label>
           <input
@@ -463,22 +460,13 @@ const EditProduct = ({ product, onClose, onSave }) => {
           />
         </div>
         <div>
-          <label className="block mb-1">From</label>
+          <label className="block mb-1">Max Discount Price</label>
           <input
-            className="input"
-            type="date"
-            name="discountFrom"
-            value={formData.discountFrom}
-            onChange={handleInputChange}
-          />
-        </div>
-        <div>
-          <label className="block mb-1">To</label>
-          <input
-            className="input"
-            type="date"
-            name="discountTo"
-            value={formData.discountTo}
+            className="input number-input"
+            placeholder="e.g., 199.99"
+            type="number"
+            name="maxDiscountPrice"
+            value={formData.maxDiscountPrice || ""}
             onChange={handleInputChange}
           />
         </div>
@@ -498,14 +486,37 @@ const EditProduct = ({ product, onClose, onSave }) => {
           />
         </div>
         <div>
-          <label className="block mb-1">Tag</label>
-          <input
-            className="input"
-            placeholder="enter tag"
-            name="tag"
-            value={formData.tag}
-            onChange={handleInputChange}
-          />
+          <label className="block mb-1">Tags</label>
+          <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-lg border">
+            {tags.map((t, i) => (
+              <span key={`${t}-${i}`} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-300 text-xs">
+                {t}
+                <button
+                  type="button"
+                  onClick={() => setTags((prev) => prev.filter((_, idx) => idx !== i))}
+                  className="text-red-600"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+            <input
+              className="flex-1 min-w-[140px] outline-none"
+              placeholder="Type and press Enter"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                  e.preventDefault();
+                  const val = tagInput.trim();
+                  if (val.length > 0 && !tags.includes(val)) {
+                    setTags((prev) => [...prev, val]);
+                  }
+                  setTagInput("");
+                }
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -569,25 +580,33 @@ const EditProduct = ({ product, onClose, onSave }) => {
         {/* Sizes */}
         <div>
           <label className="block mb-2">Size & Stock Information</label>
-          <div className="flex flex-wrap gap-2 bg-white p-3 rounded-lg border">
-            {SIZE_OPTIONS.map((size) => {
-              const active = selectedSizes.includes(size);
-              return (
-                <button
-                  key={size}
-                  type="button"
-                  onClick={() => handleSizeSelect(size)}
-                  className={`px-4 py-1.5 rounded-md border text-sm transition
-                    ${active
-                      ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
-                      : "bg-white text-gray-700 border-gray-300"
-                    }`}
-                >
-                  {size}
-                </button>
-              );
-            })}
-          </div>
+          {selectedCategoryId ? (
+            sizeOptions.length > 0 ? (
+              <div className="flex flex-wrap gap-2 bg-white p-3 rounded-lg border">
+                {sizeOptions.map((size) => {
+                  const active = selectedSizes.includes(size);
+                  return (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => handleSizeSelect(size)}
+                      className={`px-4 py-1.5 rounded-md border text-sm transition
+                        ${active
+                          ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
+                          : "bg-white text-gray-700 border-gray-300"
+                        }`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500 italic">No sizes configured for this category.</div>
+            )
+          ) : (
+            <div className="text-sm text-gray-500 italic">Select a category to see available sizes.</div>
+          )}
         </div>
 
         {/* Colors */}
@@ -625,7 +644,7 @@ const EditProduct = ({ product, onClose, onSave }) => {
         </div>
       </div>
 
-      {/* -------- Stock Table (WITH COLOR PICKER) -------- */}
+      {/* -------- Stock Table -------- */}
       {stockRows.length > 0 && (
         <div className="border rounded-lg overflow-hidden">
           <table className="w-full text-sm">
@@ -644,23 +663,7 @@ const EditProduct = ({ product, onClose, onSave }) => {
                 <tr key={i} className="border-b last:border-b-0">
                   <td className="px-3 py-2">{row.size}</td>
                   <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <div className="relative group">
-                        <div
-                          className="w-8 h-8 rounded-full border border-gray-300"
-                          style={{ backgroundColor: row.color }}
-                        />
-                        <input
-                          type="color"
-                          value={row.color}
-                          onChange={(e) => updateColorValue(i, e.target.value)}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                        />
-                      </div>
-                      <span className="text-sm font-medium">
-                        {getColorNameFromHex(row.color)}
-                      </span>
-                    </div>
+                    <span className="text-sm font-medium">{row.color}</span>
                   </td>
                   <td className="px-3 py-2">
                     <input

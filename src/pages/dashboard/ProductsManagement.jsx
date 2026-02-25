@@ -24,6 +24,7 @@ import { useListCategoriesQuery } from "../../redux/features/dashboard/category"
 import {
   useGetProductStatsQuery,
   useListProductsQuery,
+  useSearchProductsQuery,
   useDeleteProductMutation,
 } from "../../redux/features/dashboard/product.api";
 
@@ -53,31 +54,77 @@ const ProductsManagement = () => {
   const [isAddColorModalOpen, setIsAddColorModalOpen] = useState(false); // New state for Add Color modal
 
   const itemsPerPage = 10;
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedStockStatus, setSelectedStockStatus] = useState("");
 
   const { data: stats } = useGetProductStatsQuery();
-  const { data: listData, isFetching } = useListProductsQuery({
-    page: currentPage,
-    page_size: itemsPerPage,
-    q: debouncedTerm || undefined,
-  });
+  const shouldSearch =
+    Boolean(debouncedTerm && debouncedTerm.length > 0) ||
+    Boolean(selectedCategoryId) ||
+    Boolean(selectedStockStatus);
+
+  // Use list for plain listing (no filters), search for any filters/search term
+  const { data: listData, isFetching: isFetchingList } = useListProductsQuery(
+    { page: currentPage, page_size: itemsPerPage },
+    { skip: shouldSearch }
+  );
+  const { data: searchData, isFetching: isFetchingSearch } = useSearchProductsQuery(
+    {
+      page: currentPage,
+      page_size: itemsPerPage,
+      q: debouncedTerm || undefined,
+      category_id: selectedCategoryId || undefined,
+      stock_status: selectedStockStatus || undefined,
+    },
+    { skip: !shouldSearch }
+  );
+  const data = shouldSearch ? searchData : listData;
+  const isFetching = shouldSearch ? isFetchingSearch : isFetchingList;
   const [deleteProduct] = useDeleteProductMutation();
   const { data: categoriesData, isFetching: isFetchingCategories } = useListCategoriesQuery();
   const categoryOptions = [
-    "All Categories",
-    ...((categoriesData ?? []).map((c) => c.name)),
+    { label: "All Categories", value: "" },
+    ...((categoriesData ?? []).map((c) => ({
+      label: c.name,
+      value: c.category_id ?? c.id,
+    }))),
+  ];
+  const stockOptions = [
+    { label: "All Status", value: "" },
+    { label: "In Stock", value: "in_stock" },
+    { label: "Out of Stock", value: "out_of_stock" },
   ];
 
-  const totalPages = listData?.total_pages ?? 0;
-  const products = (listData?.results ?? []).map((p) => ({
+  const totalPages = data?.total_pages ?? 0;
+  const products = (data?.results ?? []).map((p) => ({
+    // IDs/Names
     id: p.product_id,
     name: p.product_name,
     subtitle: p.product_description,
+    // Media
     image: String(p.product_main_image || "").trim(),
+    images: p.images ?? (p.product_main_image ? [p.product_main_image] : []),
+    // Pricing/Stock
     price: p.price,
     currentStock: p.current_stock,
     sold: p.sold,
     status: p.status,
+    discount: typeof p.discount === "number" ? p.discount : (p.discount ? Number(p.discount) : 0),
+    max_discount_price: p.max_discount_price ?? null,
+    // Category for edit preselect
+    product_category: p.product_category, // { category_name, category_id }
+    category_id: p.product_category?.category_id,
+    // Variants for stock table
+    product_variant: p.product_variant ?? [],
     variants: p.product_variant ?? [],
+    // Description and care
+    description: p.product_description,
+    care_instructions: p.care_instructions ?? p.careInstruction ?? p.careInstructions ?? "",
+    // Tags (array of strings)
+    tags: Array.isArray(p.tags)
+      ? p.tags.map((t) => (typeof t === "string" ? t : t?.name)).filter(Boolean)
+      : [],
+    // Derived
     initialStock:
       (typeof p.current_stock === "number" ? p.current_stock : 0) +
       (typeof p.sold === "number" ? p.sold : 0),
@@ -208,11 +255,20 @@ const ProductsManagement = () => {
             <CustomSelect
               options={categoryOptions}
               disabled={isFetchingCategories}
+              value={selectedCategoryId}
+              onChange={(e) => {
+                setSelectedCategoryId(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full sm:w-44"
             />
             <CustomSelect
-              options={["All Status", "In Stock", "Low Stock", "Out of Stock"]}
-              // placeholder="All Categories"
+              options={stockOptions}
+              value={selectedStockStatus}
+              onChange={(e) => {
+                setSelectedStockStatus(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full sm:w-44"
             />
           </div>

@@ -11,7 +11,7 @@ const AddBanner = ({ onClose }) => {
   const [imagePreviews, setImagePreviews] = useState([]);
   const [imageFiles, setImageFiles] = useState([]);
 
-  // Video previews
+  // Video preview (single)
   const [videoPreviews, setVideoPreviews] = useState([]);
   const [videoFiles, setVideoFiles] = useState([]);
 
@@ -27,10 +27,10 @@ const AddBanner = ({ onClose }) => {
   const handleVideoUpload = (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-
-    const newPreviews = files.map((file) => URL.createObjectURL(file));
-    setVideoPreviews((prev) => [...prev, ...newPreviews]);
-    setVideoFiles((prev) => [...prev, ...files]);
+    const file = files[0];
+    const preview = URL.createObjectURL(file);
+    setVideoPreviews([preview]);
+    setVideoFiles([file]);
   };
 
   const removeImage = (index) => {
@@ -169,7 +169,6 @@ const AddBanner = ({ onClose }) => {
           <input
             type="file"
             accept="video/*"
-            multiple
             onChange={handleVideoUpload}
             className="hidden"
             id="banner-videos"
@@ -178,6 +177,27 @@ const AddBanner = ({ onClose }) => {
             <span className="text-primary">Add file</span> or drop Video here
           </label>
         </div>
+
+        {videoPreviews.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-4">
+            {videoPreviews.map((src, idx) => (
+              <div key={idx} className="relative w-32">
+                <video
+                  src={src}
+                  controls
+                  className="w-32 h-20 object-cover rounded border border-gray-300"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeVideo(idx)}
+                  className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 shadow-md"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Buttons */}

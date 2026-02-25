@@ -15,28 +15,6 @@ import EditPopup from "../../components/dashboard/PromotionsDiscounts/EditPopup"
 import { useListBannersQuery, useDeleteBannerMutation, useListHeadingsQuery, useDeleteHeadingMutation, useListPopupsQuery, useDeletePopupMutation, useListCouponsQuery, useDeleteCouponMutation } from "../../redux/features/dashboard/promotion";
 import { message } from "antd";
 
-// Fake data for sections other than banners
-
-const fakeHeadingAnnouncements = [
-  {
-    id: 1,
-    title: "SUMMER20",
-    status: "active",
-  },
-  {
-    id: 2,
-    title: "NEWUSER10",
-    status: "active",
-  },
-];
-
-const fakePopups = [
-  {
-    id: 1,
-    image: "Promotional Pop-ups.jpg",
-    status: "active",
-  },
-];
 
 const PromotionsDiscounts = () => {
   const [activeTab, setActiveTab] = useState("websiteBanners");
@@ -74,6 +52,8 @@ const PromotionsDiscounts = () => {
       status: b.is_active ? "active" : "inactive",
       image: b.image ?? b.image_url ?? IMAGES.product,
       video: b.video ?? b.video_url ?? null,
+      startDate: b.start_date ?? b.startDate ?? null,
+      endDate: b.end_date ?? b.endDate ?? null,
     }));
 
   const getTabData = () => {

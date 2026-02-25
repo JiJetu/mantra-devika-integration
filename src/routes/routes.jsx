@@ -11,6 +11,7 @@ import PromotionsDiscounts from "../pages/dashboard/PromotionsDiscounts";
 import ProductPopularity from "../pages/dashboard/ProductPopularity";
 import Settings from "../pages/dashboard/Settings";
 import Profile from "../pages/dashboard/Profile";
+import ShopManagement from "../pages/dashboard/ShopManagement";
 
 
 const router = createBrowserRouter([
@@ -34,6 +35,10 @@ const router = createBrowserRouter([
       {
         path: "products",
         element: <ProductsManagement />,
+      },
+      {
+        path: "shop-management",
+        element: <ShopManagement />,
       },
       {
         path: "categories",

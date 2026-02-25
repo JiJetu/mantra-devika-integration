@@ -1,12 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateProductMutation } from "../../../redux/features/dashboard/product.api";
 import { useListCategoriesQuery } from "../../../redux/features/dashboard/category";
 import { useListColorsQuery } from "../../../redux/features/dashboard/color.api";
-
-const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
-
 
 const AddProduct = () => {
   const [createProduct, { isLoading }] = useCreateProductMutation();
@@ -31,16 +28,30 @@ const AddProduct = () => {
     careInstruction: "",
     price: "",
     discount: "",
-    discountFrom: "",
-    discountTo: "",
+    maxDiscountPrice: "",
     stockQuantity: "",
-    tag: "",
   });
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState([]);
 
   const handleCategoryChange = (e) => {
     const v = e.target.value;
     setSelectedCategoryId(v);
+    setSelectedSizes([]);
+    setStockRows([]);
   };
+
+  const currentCategory = useMemo(
+    () => (categories || []).find((c) => String(c.id ?? c.category_id) === String(selectedCategoryId)),
+    [categories, selectedCategoryId],
+  );
+
+  const sizeOptions = useMemo(
+    () => Array.isArray(currentCategory?.size_guides)
+      ? currentCategory.size_guides.map((sg) => sg.size_name).filter(Boolean)
+      : [],
+    [currentCategory],
+  );
 
   /* ---------- IMAGE LOGIC (UNCHANGED) ---------- */
   const handleImageUpload = (e) => {
@@ -149,6 +160,10 @@ const AddProduct = () => {
       toast.error("Please upload at least one product photo.");
       return;
     }
+    if (!selectedCategoryId) {
+      toast.error("Please select a category.");
+      return;
+    }
     try {
       const fd = new FormData();
       fd.append("name", formData.productName || "");
@@ -156,6 +171,9 @@ const AddProduct = () => {
       fd.append("price", String(formData.price || 0));
       fd.append("actual_price", String(formData.price || 0));
       fd.append("discount", String(formData.discount || 0));
+      if (formData.maxDiscountPrice !== "") {
+        fd.append("max_discount_price", String(formData.maxDiscountPrice));
+      }
       fd.append("care_instructions", formData.careInstruction || "");
       const colors = selectedColors.map((name) => {
         const found = apiColors.find((c) => c.name === name);
@@ -167,16 +185,15 @@ const AddProduct = () => {
         stock_quantity: Number(row.current) || 0,
         color_name: row.color,
       }));
-      const tags =
-        (formData.tag || "").trim().length > 0
-          ? [{ name: formData.tag.trim() }]
-          : [];
+      const tagsPayload = tags.map((t) => ({ name: t }));
       if (selectedCategoryId) {
         fd.append("category_ids", JSON.stringify([Number(selectedCategoryId)]));
       }
       fd.append("colors", JSON.stringify(colors));
       fd.append("variants", JSON.stringify(variants));
-      fd.append("tags", JSON.stringify(tags));
+      if (tagsPayload.length > 0) {
+        fd.append("tags", JSON.stringify(tagsPayload));
+      }
       images.forEach((img) => {
         if (img?.file) fd.append("photos", img.file);
       });
@@ -189,10 +206,8 @@ const AddProduct = () => {
         careInstruction: "",
         price: "",
         discount: "",
-        discountFrom: "",
-        discountTo: "",
+        maxDiscountPrice: "",
         stockQuantity: "",
-        tag: "",
       });
       setSelectedCategoryId("");
       setImages([]);
@@ -200,6 +215,8 @@ const AddProduct = () => {
       setSelectedSizes([]);
       setSelectedColors([]);
       setStockRows([]);
+      setTags([]);
+      setTagInput("");
     } catch (e) {
       toast.error("Failed to add product");
     }
@@ -213,16 +230,16 @@ const AddProduct = () => {
       careInstruction: "",
       price: "",
       discount: "",
-      discountFrom: "",
-      discountTo: "",
+      maxDiscountPrice: "",
       stockQuantity: "",
-      tag: "",
     });
     setSelectedCategoryId("");
     setImages([]);
     setSelectedSizes([]);
     setSelectedColors([]);
     setStockRows([]);
+    setTags([]);
+    setTagInput("");
   };
 
   return (
@@ -249,8 +266,8 @@ const AddProduct = () => {
             onChange={handleCategoryChange}
           >
             <option value="">Select Category</option>
-            {categories.map((cat, idx) => {
-              const id = cat.category_id ?? idx + 1;
+            {categories.map((cat) => {
+              const id = cat.id ?? cat.category_id;
               return (
                 <option key={id} value={id}>
                   {cat.name}
@@ -286,7 +303,7 @@ const AddProduct = () => {
       </div>
 
       {/* -------- Pricing -------- */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block mb-1">Price ($)</label>
           <input
@@ -311,22 +328,13 @@ const AddProduct = () => {
           />
         </div>
         <div>
-          <label className="block mb-1">From</label>
+          <label className="block mb-1">Max Discount Price</label>
           <input
             className="input"
-            type="date"
-            name="discountFrom"
-            value={formData.discountFrom}
-            onChange={handleInputChange}
-          />
-        </div>
-        <div>
-          <label className="block mb-1">To</label>
-          <input
-            className="input"
-            type="date"
-            name="discountTo"
-            value={formData.discountTo}
+            placeholder="e.g., 199.99"
+            type="number"
+            name="maxDiscountPrice"
+            value={formData.maxDiscountPrice}
             onChange={handleInputChange}
           />
         </div>
@@ -346,14 +354,37 @@ const AddProduct = () => {
           />
         </div>
         <div>
-          <label className="block mb-1">Tag</label>
-          <input
-            className="input"
-            placeholder="enter tag"
-            name="tag"
-            value={formData.tag}
-            onChange={handleInputChange}
-          />
+          <label className="block mb-1">Tags</label>
+          <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-lg border">
+            {tags.map((t, i) => (
+              <span key={`${t}-${i}`} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-300 text-xs">
+                {t}
+                <button
+                  type="button"
+                  onClick={() => setTags((prev) => prev.filter((_, idx) => idx !== i))}
+                  className="text-red-600"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+            <input
+              className="flex-1 min-w-[140px] outline-none"
+              placeholder="Type and press Enter"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "," ) {
+                  e.preventDefault();
+                  const val = tagInput.trim();
+                  if (val.length > 0 && !tags.includes(val)) {
+                    setTags((prev) => [...prev, val]);
+                  }
+                  setTagInput("");
+                }
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -411,25 +442,33 @@ const AddProduct = () => {
         {/* Sizes */}
         <div>
           <label className="block mb-2">Size & Stock Information</label>
-          <div className="flex flex-wrap gap-2 bg-white p-3 rounded-lg border">
-            {SIZE_OPTIONS.map((size) => {
-              const active = selectedSizes.includes(size);
-              return (
-                <button
-                  key={size}
-                  type="button"
-                  onClick={() => handleSizeSelect(size)}
-                  className={`px-4 py-1.5 rounded-md border text-sm transition
-                    ${active
-                      ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
-                      : "bg-white text-gray-700 border-gray-300"
-                    }`}
-                >
-                  {size}
-                </button>
-              );
-            })}
-          </div>
+          {selectedCategoryId ? (
+            sizeOptions.length > 0 ? (
+              <div className="flex flex-wrap gap-2 bg-white p-3 rounded-lg border">
+                {sizeOptions.map((size) => {
+                  const active = selectedSizes.includes(size);
+                  return (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => handleSizeSelect(size)}
+                      className={`px-4 py-1.5 rounded-md border text-sm transition
+                        ${active
+                          ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
+                          : "bg-white text-gray-700 border-gray-300"
+                        }`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500 italic">No sizes configured for this category.</div>
+            )
+          ) : (
+            <div className="text-sm text-gray-500 italic">Select a category to see available sizes.</div>
+          )}
         </div>
 
         {/* Colors */}

@@ -4,7 +4,7 @@ import { LuLayoutDashboard, LuUsers } from "react-icons/lu";
 import { IoSettingsOutline } from "react-icons/io5";
 import { IoIosLogOut } from "react-icons/io";
 import { BsEye } from "react-icons/bs";
-import { Megaphone, Package, StickyNote } from "lucide-react";
+import { Megaphone, Package, StickyNote, Store } from "lucide-react";
 import { FiShoppingCart } from "react-icons/fi";
 import { MdPayment } from "react-icons/md";
 import { useDispatch } from "react-redux";
@@ -21,6 +21,7 @@ const DashboardSidebar = ({ collapsed = false }) => {
     { to: "/dashboard", icon: LuLayoutDashboard, label: "Dashboard Overview" },
     { to: "/dashboard/customers", icon: LuUsers, label: "Customer Management" },
     { to: "/dashboard/products", icon: Package, label: "Products Management" },
+    { to: "/dashboard/shop-management", icon: Store, label: "Shop Management" },
     {
       to: "/dashboard/categories",
       icon: StickyNote,

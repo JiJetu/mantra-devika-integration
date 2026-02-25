@@ -11,10 +11,16 @@ export const productApi = baseApi.injectEndpoints({
     }),
 
     listProducts: builder.query({
-      query: ({ page = 1, page_size = 10, q } = {}) => ({
+      query: ({ page = 1, page_size = 10, q, category_id, stock_status } = {}) => ({
         url: "/dashboard/product-management/list_products/",
         method: "GET",
-        params: q ? { page, page_size, q } : { page, page_size },
+        params: {
+          ...(q ? { q } : {}),
+          ...(category_id ? { category_id } : {}),
+          ...(stock_status ? { stock_status } : {}),
+          page,
+          page_size,
+        },
       }),
       providesTags: ["Products"],
     }),
@@ -42,12 +48,29 @@ export const productApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["Products", "ProductStats"],
     }),
+
+    // Search and filter products (admin)
+    searchProducts: builder.query({
+      query: ({ q, category_id, stock_status, page = 1, page_size = 10 } = {}) => ({
+        url: "/dashboard/product-management/products/search/",
+        method: "GET",
+        params: {
+          ...(q ? { q } : {}),
+          ...(category_id ? { category_id } : {}),
+          ...(stock_status ? { stock_status } : {}),
+          page,
+          page_size,
+        },
+      }),
+      providesTags: ["Products"],
+    }),
   }),
 });
 
 export const {
   useGetProductStatsQuery,
   useListProductsQuery,
+  useSearchProductsQuery,
   useDeleteProductMutation,
   useCreateProductMutation,
   useEditProductMutation,
