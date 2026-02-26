@@ -97,7 +97,7 @@ const CategoriesManagement = () => {
                   <img
                     src={category.image}
                     alt={category.name}
-                    className="w-10 h-10 md:w-12 md:h-12 object-cover rounded-lg border border-gray-200 bg-[#FFF8E6]"
+                    className="w-10 h-10 md:w-12 md:h-12 object-start rounded-lg border border-gray-200 bg-[#FFF8E6]"
                   />
                   <div className="flex items-center gap-3 opacity-70 group-hover:opacity-100 transition-opacity">
                     <button

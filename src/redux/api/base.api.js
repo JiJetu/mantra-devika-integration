@@ -19,6 +19,9 @@ const baseQueryWithExpiryGuard = async (args, api, extraOptions) => {
 
   if (result?.error?.status === 401) {
     api.dispatch(logout());
+    if (typeof window !== "undefined" && window.location?.pathname !== "/login") {
+      window.location.replace("/login");
+    }
   }
 
   return result;

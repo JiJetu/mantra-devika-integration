@@ -5,7 +5,7 @@ import { useCreateProductMutation } from "../../../redux/features/dashboard/prod
 import { useListCategoriesQuery } from "../../../redux/features/dashboard/category";
 import { useListColorsQuery } from "../../../redux/features/dashboard/color.api";
 
-const AddProduct = () => {
+const AddProduct = ({ onClose }) => {
   const [createProduct, { isLoading }] = useCreateProductMutation();
   const { data: categories = [] } = useListCategoriesQuery();
   const { data: apiColors = [] } = useListColorsQuery();
@@ -42,14 +42,18 @@ const AddProduct = () => {
   };
 
   const currentCategory = useMemo(
-    () => (categories || []).find((c) => String(c.id ?? c.category_id) === String(selectedCategoryId)),
+    () =>
+      (categories || []).find(
+        (c) => String(c.id ?? c.category_id) === String(selectedCategoryId),
+      ),
     [categories, selectedCategoryId],
   );
 
   const sizeOptions = useMemo(
-    () => Array.isArray(currentCategory?.size_guides)
-      ? currentCategory.size_guides.map((sg) => sg.size_name).filter(Boolean)
-      : [],
+    () =>
+      Array.isArray(currentCategory?.size_guides)
+        ? currentCategory.size_guides.map((sg) => sg.size_name).filter(Boolean)
+        : [],
     [currentCategory],
   );
 
@@ -155,13 +159,14 @@ const AddProduct = () => {
 
   /* ---------- HANDLE FORM SUBMIT ---------- */
   const handleSubmit = async () => {
+    const toastId = toast.loading("Adding product...");
     if (images.length === 0) {
       setImageError(true);
-      toast.error("Please upload at least one product photo.");
+      toast.error("Please upload at least one product photo.", { id: toastId });
       return;
     }
     if (!selectedCategoryId) {
-      toast.error("Please select a category.");
+      toast.error("Please select a category.", { id: toastId });
       return;
     }
     try {
@@ -199,7 +204,8 @@ const AddProduct = () => {
       });
       fd.append("is_main_index", "0");
       await createProduct(fd).unwrap();
-      toast.success("Product added successfully!");
+      onClose();
+      toast.success("Product added successfully!", { id: toastId });
       setFormData({
         productName: "",
         productDetails: "",
@@ -218,7 +224,7 @@ const AddProduct = () => {
       setTags([]);
       setTagInput("");
     } catch (e) {
-      toast.error("Failed to add product");
+      toast.error("Failed to add product", { id: toastId });
     }
   };
 
@@ -240,6 +246,7 @@ const AddProduct = () => {
     setStockRows([]);
     setTags([]);
     setTagInput("");
+    onClose();
   };
 
   return (
@@ -357,11 +364,16 @@ const AddProduct = () => {
           <label className="block mb-1">Tags</label>
           <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-lg border">
             {tags.map((t, i) => (
-              <span key={`${t}-${i}`} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-300 text-xs">
+              <span
+                key={`${t}-${i}`}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-300 text-xs"
+              >
                 {t}
                 <button
                   type="button"
-                  onClick={() => setTags((prev) => prev.filter((_, idx) => idx !== i))}
+                  onClick={() =>
+                    setTags((prev) => prev.filter((_, idx) => idx !== i))
+                  }
                   className="text-red-600"
                 >
                   <X size={12} />
@@ -374,7 +386,7 @@ const AddProduct = () => {
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === "," ) {
+                if (e.key === "Enter" || e.key === ",") {
                   e.preventDefault();
                   const val = tagInput.trim();
                   if (val.length > 0 && !tags.includes(val)) {
@@ -396,16 +408,19 @@ const AddProduct = () => {
 
         <div
           onClick={() => fileInputRef.current.click()}
-          className={`border border-dashed rounded-lg py-4 text-center cursor-pointer transition-colors ${imageError
-            ? "bg-red-50 border-red-500"
-            : "bg-[#F3EAEA] border-[#6E0B0B]"
-            }`}
+          className={`border border-dashed rounded-lg py-4 text-center cursor-pointer transition-colors ${
+            imageError
+              ? "bg-red-50 border-red-500"
+              : "bg-[#F3EAEA] border-[#6E0B0B]"
+          }`}
         >
           <p className="text-[#6E0B0B] font-medium">
             Add file <span className="text-gray-500">or drop files here</span>
           </p>
           {imageError && (
-            <p className="text-red-500 text-xs mt-1">At least one photo is required</p>
+            <p className="text-red-500 text-xs mt-1">
+              At least one photo is required
+            </p>
           )}
         </div>
 
@@ -453,9 +468,10 @@ const AddProduct = () => {
                       type="button"
                       onClick={() => handleSizeSelect(size)}
                       className={`px-4 py-1.5 rounded-md border text-sm transition
-                        ${active
-                          ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
-                          : "bg-white text-gray-700 border-gray-300"
+                        ${
+                          active
+                            ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
+                            : "bg-white text-gray-700 border-gray-300"
                         }`}
                     >
                       {size}
@@ -464,10 +480,14 @@ const AddProduct = () => {
                 })}
               </div>
             ) : (
-              <div className="text-sm text-gray-500 italic">No sizes configured for this category.</div>
+              <div className="text-sm text-gray-500 italic">
+                No sizes configured for this category.
+              </div>
             )
           ) : (
-            <div className="text-sm text-gray-500 italic">Select a category to see available sizes.</div>
+            <div className="text-sm text-gray-500 italic">
+              Select a category to see available sizes.
+            </div>
           )}
         </div>
 
@@ -476,11 +496,14 @@ const AddProduct = () => {
           <label className="block mb-2">Color Select</label>
           <div className="flex flex-wrap gap-2 bg-white p-3 rounded-lg border">
             {apiColors.length === 0 ? (
-              <span className="text-sm text-gray-400 italic">No colors available. Add colors first.</span>
+              <span className="text-sm text-gray-400 italic">
+                No colors available. Add colors first.
+              </span>
             ) : (
               apiColors.map((color) => {
                 const colorName = color.name;
-                const colorHex = color.hex_code || color.color_code || "#cccccc";
+                const colorHex =
+                  color.hex_code || color.color_code || "#cccccc";
                 const active = selectedColors.includes(colorName);
                 return (
                   <button
@@ -488,9 +511,10 @@ const AddProduct = () => {
                     type="button"
                     onClick={() => handleColorSelect(colorName)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm transition
-                      ${active
-                        ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
-                        : "bg-white text-gray-700 border-gray-300"
+                      ${
+                        active
+                          ? "bg-[#6E0B0B] text-white border-[#6E0B0B]"
+                          : "bg-white text-gray-700 border-gray-300"
                       }`}
                   >
                     <span

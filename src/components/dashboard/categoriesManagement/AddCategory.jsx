@@ -165,7 +165,7 @@ const AddCategory = ({ onClose }) => {
       {/* Update your sizeguide */}
       <div>
         <label className="block text-sm md:text-base text-gray-700 mb-2">
-          Update your sizeguide
+          Update your size guide {sizeGuide.length === 0 && `(click on the ⨁ button)`}
         </label>
         <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_auto] gap-3">
           <CustomSelect

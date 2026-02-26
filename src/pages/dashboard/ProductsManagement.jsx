@@ -96,14 +96,20 @@ const ProductsManagement = () => {
   ];
 
   const totalPages = data?.total_pages ?? 0;
-  const products = (data?.results ?? []).map((p) => ({
+  const products = (data?.results ?? []).map((p) => {
+    const photoUrls = Array.isArray(p.product_photos)
+      ? p.product_photos.map((ph) => String(ph?.url || "").trim()).filter(Boolean)
+      : [];
+    const mainImage = String(p.product_main_image || photoUrls[0] || "").trim();
+    return {
     // IDs/Names
     id: p.product_id,
     name: p.product_name,
     subtitle: p.product_description,
     // Media
-    image: String(p.product_main_image || "").trim(),
-    images: p.images ?? (p.product_main_image ? [p.product_main_image] : []),
+    image: mainImage,
+    images: photoUrls.length > 0 ? photoUrls : (p.images ?? (p.product_main_image ? [p.product_main_image] : [])),
+    product_photos: Array.isArray(p.product_photos) ? p.product_photos : [],
     // Pricing/Stock
     price: p.price,
     currentStock: p.current_stock,
@@ -112,7 +118,7 @@ const ProductsManagement = () => {
     discount: typeof p.discount === "number" ? p.discount : (p.discount ? Number(p.discount) : 0),
     max_discount_price: p.max_discount_price ?? null,
     // Category for edit preselect
-    product_category: p.product_category, // { category_name, category_id }
+    product_category: p.product_category,
     category_id: p.product_category?.category_id,
     // Variants for stock table
     product_variant: p.product_variant ?? [],
@@ -128,7 +134,7 @@ const ProductsManagement = () => {
     initialStock:
       (typeof p.current_stock === "number" ? p.current_stock : 0) +
       (typeof p.sold === "number" ? p.sold : 0),
-  }));
+  }});
 
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
@@ -138,10 +144,6 @@ const ProductsManagement = () => {
   const totalCurrentStock = stats?.total_current_stock ?? 0;
   const totalSold = stats?.total_sold ?? 0;
   const lowStockItems = stats?.total_low_stock_item ?? 0;
-
-  const handleViewSizes = (product) => {
-    setSelectedProduct(product);
-  };
 
   const confirmDelete = (productId) => {
     AntModal.confirm({

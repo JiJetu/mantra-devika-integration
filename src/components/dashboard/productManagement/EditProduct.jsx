@@ -4,6 +4,7 @@ import { useListColorsQuery } from "../../../redux/features/dashboard/color.api"
 import { useListCategoriesQuery } from "../../../redux/features/dashboard/category";
 import { useEditProductMutation } from "../../../redux/features/dashboard/product.api";
 import { message } from "antd";
+import { toast } from "sonner";
 
 /* ---------- SIZE DATA ---------- */
 // Now driven by selected category's size_guides
@@ -105,6 +106,9 @@ const EditProduct = ({ product, onClose, onSave }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [images, setImages] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
+  const initialExistingIdsRef = useRef([]);
   const fileInputRef = useRef(null);
   const [selectedSizes, setSelectedSizes] = useState([]);
   const [selectedColors, setSelectedColors] = useState([]);
@@ -143,9 +147,28 @@ const EditProduct = ({ product, onClose, onSave }) => {
         ""
       );
 
-      // Set images
-      const productImages = product.images || (product.image ? [product.image] : (product.product_main_image ? [product.product_main_image] : []));
-      setExistingImages(productImages);
+      const photos = Array.isArray(product.product_photos)
+        ? product.product_photos
+        : [];
+      if (photos.length > 0) {
+        const normalized = photos
+          .map((ph) => ({
+            id: ph.photo_id ?? ph.id,
+            url: ph.url,
+            is_main: ph.is_main,
+          }))
+          .filter((ph) => ph.url);
+        setExistingImages(normalized);
+        initialExistingIdsRef.current = normalized
+          .map((ph) => ph.id)
+          .filter((id) => typeof id !== "undefined");
+      } else {
+        const productImages =
+          product.images ||
+          (product.image ? [product.image] : product.product_main_image ? [product.product_main_image] : []);
+        setExistingImages(productImages);
+        initialExistingIdsRef.current = [];
+      }
       setImages([]);
 
       // Prefill tags
@@ -307,10 +330,18 @@ const EditProduct = ({ product, onClose, onSave }) => {
 
   /* ---------- FORM SUBMISSION ---------- */
   const handleSubmit = async (e) => {
+    const toastId = toast.loading("Updating product...");
     e.preventDefault();
     try {
       const productId = product?.id ?? product?.product_id;
       const fd = new FormData();
+      const keptExistingUrls = (existingImages || []).map((img) =>
+        typeof img === "string" ? img : img?.url
+      ).filter(Boolean);
+      if ((keptExistingUrls.length + images.length) === 0) {
+        toast.error("At least one product photo is required", { id: toastId });
+        return;
+      }
       if (formData.productName) fd.append("name", formData.productName);
       if (formData.productDetails) fd.append("description", formData.productDetails);
       if (formData.careInstruction) fd.append("care_instructions", formData.careInstruction);
@@ -350,21 +381,29 @@ const EditProduct = ({ product, onClose, onSave }) => {
         fd.append("tags", JSON.stringify(tags.map((t) => ({ name: t }))));
       }
 
-      // Photos
-      images.forEach(img => {
+      // Photos handling:
+      // Always replace on backend by sending clear_photos and re-uploading kept existing + new files
+      // Fetch existing image URLs as files
+      const urlToFile = async (url, i) => {
+        const res = await fetch(url, { mode: "cors" });
+        const blob = await res.blob();
+        const ext = (blob.type && blob.type.split("/")[1]) || "jpg";
+        const nameFromUrl = url.split("/").pop()?.split("?")[0] || `existing_${i}.${ext}`;
+        return new File([blob], nameFromUrl, { type: blob.type || "image/jpeg" });
+      };
+      const existingFiles = await Promise.all(keptExistingUrls.map((u, i) => urlToFile(u, i)));
+      existingFiles.forEach((file) => fd.append("photos", file));
+      images.forEach((img) => {
         if (img?.file) fd.append("photos", img.file);
       });
-      // If user removed all existing images and there were some before, clear old
-      if ((existingImages?.length ?? 0) === 0 && (product?.images?.length > 0 || product?.image || product?.product_main_image)) {
-        fd.append("clear_photos", "true");
-      }
+      fd.append("clear_photos", "true");
 
       await editProduct({ productId, body: fd }).unwrap();
-      message.success("Product updated");
+      toast.success("Product updated", { id: toastId });
       onSave?.();
       onClose?.();
     } catch {
-      message.error("Failed to update product");
+      toast.error("Failed to update product", { id: toastId });
     }
   };
 
@@ -544,9 +583,22 @@ const EditProduct = ({ product, onClose, onSave }) => {
 
         {/* Existing Images */}
         <div className="flex gap-2 mt-3">
-          {existingImages.map((img, i) => (
+          {existingImages.map((img, i) => {
+            const url = typeof img === "string" ? img : img?.url;
+            const isMain = typeof img === "object" ? !!img?.is_main : false;
+            return (
             <div key={`existing-${i}`} className="relative">
-              <img src={img} alt="" className="w-10 h-14 object-cover border rounded" />
+              <img
+                src={url}
+                alt=""
+                className="w-10 h-14 object-cover border rounded cursor-pointer"
+                onClick={() => { setPreviewUrl(url); setShowPreview(true); }}
+              />
+              {isMain && (
+                <span className="absolute -top-2 left-0 bg-green-600 text-white text-[10px] px-1.5 py-[2px] rounded">
+                  Main
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => removeExistingImage(i)}
@@ -555,14 +607,19 @@ const EditProduct = ({ product, onClose, onSave }) => {
                 <X size={12} className="text-red-600" />
               </button>
             </div>
-          ))}
+          )})}
         </div>
 
         {/* New Images */}
         <div className="flex gap-2 mt-3">
           {images.map((img, i) => (
             <div key={`new-${i}`} className="relative">
-              <img src={img.preview} alt="" className="w-10 h-14 object-cover border rounded" />
+              <img
+                src={img.preview}
+                alt=""
+                className="w-10 h-14 object-cover border rounded cursor-pointer"
+                onClick={() => { setPreviewUrl(img.preview); setShowPreview(true); }}
+              />
               <button
                 type="button"
                 onClick={() => removeImage(i)}
@@ -573,6 +630,21 @@ const EditProduct = ({ product, onClose, onSave }) => {
             </div>
           ))}
         </div>
+
+        {showPreview && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+            <div className="relative max-w-[90vw] max-h-[90vh]">
+              <img src={previewUrl} alt="" className="max-w-full max-h-[85vh] rounded shadow-lg" />
+              <button
+                type="button"
+                onClick={() => setShowPreview(false)}
+                className="absolute -top-3 -right-3 bg-white rounded-full p-1 shadow"
+              >
+                <X size={16} className="text-red-600" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* -------- Size & Color (CHIP STYLE) -------- */}
