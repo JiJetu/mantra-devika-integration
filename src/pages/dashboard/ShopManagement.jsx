@@ -4,20 +4,26 @@ import { message } from "antd";
 import {
   useOpenShopMutation,
   useCloseShopMutation,
-  useSetShopStatusMutation,
+  useGetShopStatusQuery,
 } from "../../redux/features/dashboard/shop";
 
 const ShopManagement = () => {
   const [isOpen, setIsOpen] = useState(null);
   const [openShop, { isLoading: opening }] = useOpenShopMutation();
   const [closeShop, { isLoading: closing }] = useCloseShopMutation();
-  const [setShopStatus, { isLoading: setting }] = useSetShopStatusMutation();
+  const { data, isFetching, refetch } = useGetShopStatusQuery();
 
   const onToggle = async (e) => {
     const next = e.target.checked;
     try {
-      await setShopStatus({ is_open: next }).unwrap();
-      setIsOpen(next);
+      if (next) {
+        await openShop({ is_open: true }).unwrap();
+        setIsOpen(true);
+      } else {
+        await closeShop({ is_open: false }).unwrap();
+        setIsOpen(false);
+      }
+      await refetch();
       message.success(next ? "Shop opened" : "Shop closed");
     } catch {
       message.error("Failed to update shop status");
@@ -28,6 +34,7 @@ const ShopManagement = () => {
     try {
       await openShop({ is_open: true }).unwrap();
       setIsOpen(true);
+      await refetch();
       message.success("Shop opened");
     } catch {
       message.error("Failed to open shop");
@@ -38,6 +45,7 @@ const ShopManagement = () => {
     try {
       await closeShop({ is_open: false }).unwrap();
       setIsOpen(false);
+      await refetch();
       message.success("Shop closed");
     } catch {
       message.error("Failed to close shop");
@@ -55,25 +63,27 @@ const ShopManagement = () => {
           <div>
             <p className="text-lg font-semibold text-gray-900">Shop Status</p>
             <p className="text-sm text-gray-500">
-              {isOpen === null ? "Unknown" : isOpen ? "Open" : "Closed"}
+              {(data?.shop_status ?? isOpen) === null || (typeof (data?.shop_status ?? isOpen) === "undefined")
+                ? "Unknown"
+                : (data?.shop_status ?? isOpen) ? "Open" : "Closed"}
             </p>
           </div>
           <label className="inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
               className="sr-only"
-              checked={!!isOpen}
+              checked={!!(data?.shop_status ?? isOpen)}
               onChange={onToggle}
-              disabled={opening || closing || setting}
+              disabled={true}
             />
             <span
               className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${
-                isOpen ? "bg-green-500" : "bg-gray-300"
+                (data?.shop_status ?? isOpen) ? "bg-green-500" : "bg-gray-300"
               }`}
             >
               <span
                 className={`bg-white w-4 h-4 rounded-full shadow transform transition-transform ${
-                  isOpen ? "translate-x-6" : "translate-x-0"
+                  (data?.shop_status ?? isOpen) ? "translate-x-6" : "translate-x-0"
                 }`}
               />
             </span>
@@ -83,14 +93,14 @@ const ShopManagement = () => {
         <div className="mt-6 flex gap-3">
           <button
             onClick={onOpen}
-            disabled={opening || setting}
+            disabled={opening || isFetching}
             className="px-5 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
           >
             Open Shop
           </button>
           <button
             onClick={onClose}
-            disabled={closing || setting}
+            disabled={closing || isFetching}
             className="px-5 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
           >
             Close Shop
@@ -102,4 +112,3 @@ const ShopManagement = () => {
 };
 
 export default ShopManagement;
-

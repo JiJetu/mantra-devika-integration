@@ -2,6 +2,12 @@ import { baseApi } from "../../api/base.api";
 
 export const shopApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    getShopStatus: builder.query({
+      query: () => ({
+        url: "/dashboard/shop-control/status/",
+        method: "POST",
+      }),
+    }),
     openShop: builder.mutation({
       query: (body = { is_open: true }) => ({
         url: "/dashboard/shop-control/open/",
@@ -30,6 +36,7 @@ export const shopApi = baseApi.injectEndpoints({
 });
 
 export const {
+  useGetShopStatusQuery,
   useOpenShopMutation,
   useCloseShopMutation,
   useSetShopStatusMutation,
