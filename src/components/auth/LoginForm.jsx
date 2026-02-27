@@ -28,7 +28,7 @@ export default function LoginForm({ onSubmit, isLoading = false }) {
         type="email"
         containerClassName="lora"
         className="bg-transparent rounded-xl"
-        placeholder="admin@maantra.com"
+        placeholder="Enter your email address"
         icon={Mail}
         error={errors.email}
         {...register("email")}
